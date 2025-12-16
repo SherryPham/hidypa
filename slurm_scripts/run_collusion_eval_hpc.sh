@@ -10,24 +10,36 @@
 #SBATCH --mem=32G
 #SBATCH --time=8:00:00
 #SBATCH --output=slurm_out/slurm-%j.out
+module --force purge
+module load apptainer
 
-module purge
-module load gcc/14.2.0
-module load python-scientific/3.10.8-foss-2022b
-module load cuda/12.8.0
-module load cudnn/9.10.1.4-cuda-12.8.0@slurm_scripts
+PROJECT=/fred/oz411/kpham/crypto-watermark
+SIF=/fred/oz411/kpham/containers/crypto-watermark.sif
+HF=/fred/oz411/kpham/huggingface
 
-source /fred/oz411/kpham/crypto-watermark/venv/bin/activate
-
-export HF_HOME=/fred/oz411/kpham/huggingface
-export TRANSFORMERS_CACHE=$HF_HOME
+export HF_HOME=$HF
+export HF_HUB_CACHE=$HF
+export HF_DATASETS_CACHE=$HF
+export TRANSFORMERS_CACHE=$HF
+export NLTK_DATA=$HF/nltk_data
 export TRANSFORMERS_OFFLINE=1
 export HF_HUB_OFFLINE=1
-export HF_DATASETS_CACHE=$HF_HOME
-export HF_HUB_CACHE=$HF_HOME
-export NLTK_DATA=$HF_HOME
 
-cd /fred/oz411/kpham/crypto-watermark
+mkdir -p slurm_out
+cd $PROJECT
+
+run_py () {
+  apptainer exec --nv \
+    -B /fred \
+    --env HF_HOME=$HF_HOME \
+    --env HF_HUB_CACHE=$HF_HUB_CACHE \
+    --env HF_DATASETS_CACHE=$HF_DATASETS_CACHE \
+    --env TRANSFORMERS_CACHE=$TRANSFORMERS_CACHE \
+    --env NLTK_DATA=$NLTK_DATA \
+    --env TRANSFORMERS_OFFLINE=$TRANSFORMERS_OFFLINE \
+    --env HF_HUB_OFFLINE=$HF_HUB_OFFLINE \
+    $SIF python3 "$@"
+}
 
 RUN_TAG=${RUN_TAG:-job_${SLURM_JOB_ID:-$(date +%Y%m%d_%H%M%S)}}
 echo "Using run tag: ${RUN_TAG}"
@@ -40,7 +52,7 @@ echo ""
 echo "=========================================="
 echo "Configuration 1: Naive (L=8)"
 echo "=========================================="
-python evaluation_scripts/compare_collusion_resistance.py \
+run_py evaluation_scripts/compare_collusion_resistance.py \
     --scheme naive \
     --l-bits 8 \
     --prompts-file assets/prompts.txt \
@@ -60,7 +72,7 @@ echo ""
 echo "=========================================="
 echo "Configuration 2: Hierarchical G=1, U=7"
 echo "=========================================="
-python evaluation_scripts/compare_collusion_resistance.py \
+run_py evaluation_scripts/compare_collusion_resistance.py \
     --scheme hierarchical \
     --group-bits 1 \
     --user-bits 7 \
@@ -82,7 +94,7 @@ echo ""
 echo "=========================================="
 echo "Configuration 3: Hierarchical G=2, U=6"
 echo "=========================================="
-python evaluation_scripts/compare_collusion_resistance.py \
+run_py evaluation_scripts/compare_collusion_resistance.py \
     --scheme hierarchical \
     --group-bits 2 \
     --user-bits 6 \
@@ -104,7 +116,7 @@ echo ""
 echo "=========================================="
 echo "Configuration 4: Hierarchical G=3, U=5"
 echo "=========================================="
-python evaluation_scripts/compare_collusion_resistance.py \
+run_py evaluation_scripts/compare_collusion_resistance.py \
     --scheme hierarchical \
     --group-bits 3 \
     --user-bits 5 \
@@ -126,7 +138,7 @@ echo ""
 echo "=========================================="
 echo "Configuration 5: Hierarchical G=4, U=4"
 echo "=========================================="
-python evaluation_scripts/compare_collusion_resistance.py \
+run_py evaluation_scripts/compare_collusion_resistance.py \
     --scheme hierarchical \
     --group-bits 4 \
     --user-bits 4 \
@@ -148,7 +160,7 @@ echo ""
 echo "=========================================="
 echo "Configuration 6: Hierarchical G=5, U=3"
 echo "=========================================="
-python evaluation_scripts/compare_collusion_resistance.py \
+run_py evaluation_scripts/compare_collusion_resistance.py \
     --scheme hierarchical \
     --group-bits 5 \
     --user-bits 3 \
@@ -170,7 +182,7 @@ echo ""
 echo "=========================================="
 echo "Configuration 7: Hierarchical G=6, U=2"
 echo "=========================================="
-python evaluation_scripts/compare_collusion_resistance.py \
+run_py evaluation_scripts/compare_collusion_resistance.py \
     --scheme hierarchical \
     --group-bits 6 \
     --user-bits 2 \
@@ -192,7 +204,7 @@ echo ""
 echo "=========================================="
 echo "Configuration 8: Hierarchical G=7, U=1"
 echo "=========================================="
-python evaluation_scripts/compare_collusion_resistance.py \
+run_py evaluation_scripts/compare_collusion_resistance.py \
     --scheme hierarchical \
     --group-bits 7 \
     --user-bits 1 \
@@ -214,7 +226,7 @@ echo ""
 echo "=========================================="
 echo "Configuration 9: Group-only G=8, U=0"
 echo "=========================================="
-python evaluation_scripts/compare_collusion_resistance.py \
+run_py evaluation_scripts/compare_collusion_resistance.py \
     --scheme hierarchical \
     --group-bits 8 \
     --user-bits 0 \
