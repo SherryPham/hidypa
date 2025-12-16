@@ -2,7 +2,7 @@
 
 #SBATCH --job-name=hier_detection
 #SBATCH --account=oz411
-#SBATCH -p volta-gpu
+#SBATCH -p skylake-gpu
 #SBATCH --gres=gpu:1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -38,7 +38,7 @@ run_py () {
     --env NLTK_DATA=$NLTK_DATA \
     --env TRANSFORMERS_OFFLINE=$TRANSFORMERS_OFFLINE \
     --env HF_HUB_OFFLINE=$HF_HUB_OFFLINE \
-    $SIF python3 "$@"
+    "$SIF" python3 "$@"
 }
 
 RUN_TAG=${RUN_TAG:-job_${SLURM_JOB_ID:-$(date +%Y%m%d_%H%M%S)}}
