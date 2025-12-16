@@ -1,0 +1,19 @@
+{
+  "scheme": "naive",
+  "model": "gpt2",
+  "run_tag": "job_7880969",
+  "l_bits": 8,
+  "group_bits": null,
+  "user_bits": null,
+  "num_prompts": 200,
+  "random_seed": 652947985,
+  "output_directory": "/fred/oz411/kpham/crypto-watermark/evaluation/hierarchical_detection/naive/L8/job_7880969",
+  "raw_results_file": null,
+  "generated_utc": "2025-12-16T11:56:27.456183Z",
+  "metrics": {
+    "lbit_accuracy": 0.83,
+    "full_identity_accuracy": 0.875,
+    "false_positive_rate": 0.095,
+    "false_negative_rate": 0.03
+  }
+}
