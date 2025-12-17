@@ -1,0 +1,3 @@
+scheme,init_time_sec,init_memory_mb,storage_mb,num_groups,users_per_group,embed_time_sec,embed_overhead_percent,time_per_token_ms,detect_time_sec,hmac_operations,trace_time_sec,trace_comparisons,max_users,max_groups,max_users_per_group,group_bits,user_bits
+naive,0.052189499998348765,0.765625,0.0,0,0.0,20.76068279400046,24.72335102859954,43.620998977473946,4.73834450400027,16.0,0.000436076000041794,128.0,256,,,,
+hierarchical_G7_U1,0.12281620000430848,0.109375,0.004638671875,64,2.0,21.278571304999204,1.6392622521979847,43.67252973126784,4.8583331209994505,16.0,0.0004850889995577745,128.0,256,128.0,2.0,7.0,1.0

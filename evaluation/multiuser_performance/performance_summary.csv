@@ -1,0 +1,2 @@
+scheme,init_time_sec,init_memory_mb,storage_mb,num_groups,users_per_group,embed_time_sec,embed_overhead_percent,time_per_token_ms,detect_time_sec,hmac_operations,trace_time_sec,trace_comparisons,max_users
+naive,0.09498387295752764,1.453125,0,0,0,4.729887417954548,89.46139478275832,9.83508029928031,2.171355221051102,20.0,0.0003761253831908107,128.0,1024
