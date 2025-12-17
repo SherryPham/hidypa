@@ -82,7 +82,7 @@ run_py evaluation_scripts/compare_collusion_resistance.py \
     --users-file assets/users.csv \
     --model gpt2 \
     --delta 3.5 \
-    --entropy-threshold 2.5 \
+    --entropy-threshold 2.5 \z
     --hashing-context 5 \
     --z-threshold 4.0 \
     --max-new-tokens 400 \

@@ -33,14 +33,38 @@ from src.fingerprinting import generate_user_fingerprint
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def apply_synonym_substitution(text: str, ratio: float = 0.1) -> str:
-    """Replace random words with synonyms using WordNet."""
+def apply_synonym_substitution(text: str, ratio: float = 0.1, mode: str = "random") -> str:
+    """
+    Replace words with synonyms using WordNet.
+    
+    Args:
+        text: Text to modify
+        ratio: Fraction of words to replace (0.05, 0.10, 0.15, 0.20)
+        mode: Selection mode - "start", "middle", "end", or "random"
+    
+    Returns:
+        Modified text
+    """
     tokens = text.split()
     if not tokens:
         return text
 
     num_to_replace = max(1, int(len(tokens) * ratio))
-    indices = random.sample(range(len(tokens)), min(num_to_replace, len(tokens)))
+    
+    # Select indices based on mode
+    if mode == "start":
+        indices = list(range(min(num_to_replace, len(tokens))))
+    elif mode == "end":
+        indices = list(range(max(0, len(tokens) - num_to_replace), len(tokens)))
+    elif mode == "middle":
+        center = len(tokens) // 2
+        start_idx = max(0, center - num_to_replace // 2)
+        end_idx = min(len(tokens), start_idx + num_to_replace)
+        indices = list(range(start_idx, end_idx))
+    elif mode == "random":
+        indices = random.sample(range(len(tokens)), min(num_to_replace, len(tokens)))
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
 
     for idx in indices:
         word = tokens[idx]
@@ -225,41 +249,44 @@ def evaluate_prompt_with_synonym_attack(
     except Exception:
         ground_truth_codeword = None
     
-    # Define attack intensities
+    # Define attack variants
     synonym_ratios = [0.05, 0.10, 0.15, 0.20]
+    synonym_modes = ["start", "middle", "end", "random"]
     
     all_results = []
     
-    # Test each attack intensity
+    # Test each attack variant
     for synonym_ratio in synonym_ratios:
-        # Apply synonym substitution attack
-        attacked_text = apply_synonym_substitution(final_text, ratio=synonym_ratio)
-        
-        # Detect L-bit codeword on attacked text
-        recovered_codeword = muw.lbw.detect(master_key, attacked_text)
-        
-        # Compute z-score
-        z_score = compute_z_score(muw.lbw, master_key, attacked_text)
-        
-        # Count invalid symbols
-        num_invalid_symbols = count_invalid_symbols(recovered_codeword)
-        
-        # Compute Hamming distance
-        hamming_dist = (
-            hamming_distance(recovered_codeword, ground_truth_codeword)
-            if ground_truth_codeword
-            else float("inf")
-        )
-        
-        result = {
-            "true_user_id": true_user_id,
-            "synonym_ratio": synonym_ratio,
-            "recovered_codeword": recovered_codeword,
-            "ground_truth_codeword": ground_truth_codeword,
-            "num_invalid_symbols": num_invalid_symbols,
-            "hamming_distance": hamming_dist if hamming_dist != float("inf") else None,
-            "z_score": z_score,
-        }
+        for synonym_mode in synonym_modes:
+            # Apply synonym substitution attack
+            attacked_text = apply_synonym_substitution(final_text, ratio=synonym_ratio, mode=synonym_mode)
+            
+            # Detect L-bit codeword on attacked text
+            recovered_codeword = muw.lbw.detect(master_key, attacked_text)
+            
+            # Compute z-score
+            z_score = compute_z_score(muw.lbw, master_key, attacked_text)
+            
+            # Count invalid symbols
+            num_invalid_symbols = count_invalid_symbols(recovered_codeword)
+            
+            # Compute Hamming distance
+            hamming_dist = (
+                hamming_distance(recovered_codeword, ground_truth_codeword)
+                if ground_truth_codeword
+                else float("inf")
+            )
+            
+            result = {
+                "true_user_id": true_user_id,
+                "synonym_ratio": synonym_ratio,
+                "synonym_mode": synonym_mode,
+                "recovered_codeword": recovered_codeword,
+                "ground_truth_codeword": ground_truth_codeword,
+                "num_invalid_symbols": num_invalid_symbols,
+                "hamming_distance": hamming_dist if hamming_dist != float("inf") else None,
+                "z_score": z_score,
+            }
         
         if scheme == "naive":
             detected_user_id = decode_naive_user(muw, recovered_codeword)
@@ -719,7 +746,8 @@ def main():
 
     print(f"\n[3/4] Processing {len(prompts)} prompts with synonym attacks...")
     print(f"  → Testing intensities: 5%, 10%, 15%, 20%")
-    print(f"  → Total attack variants per prompt: 4")
+    print(f"  → Testing modes: start, middle, end, random")
+    print(f"  → Total attack variants per prompt: 16")
     all_results = []
 
     for prompt_idx, prompt in enumerate(tqdm(prompts, desc="Processing prompts", unit="prompt")):
@@ -763,9 +791,10 @@ def main():
         "group_bits": args.group_bits if args.scheme == "hierarchical" else None,
         "user_bits": args.user_bits if args.scheme == "hierarchical" else None,
         "num_prompts": len(prompts),
-        "num_attack_variants_per_prompt": 4,
+        "num_attack_variants_per_prompt": 16,
         "total_attack_results": len(all_results),
         "synonym_ratios": [0.05, 0.10, 0.15, 0.20],
+        "synonym_modes": ["start", "middle", "end", "random"],
         "random_seed": seed,
         "output_directory": scheme_output_dir,
         "raw_results_file": os.path.basename(raw_results_path) if raw_results_path else None,

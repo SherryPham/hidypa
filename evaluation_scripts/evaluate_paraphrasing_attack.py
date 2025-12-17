@@ -40,13 +40,14 @@ paraphraser_model = AutoModelForSeq2SeqLM.from_pretrained(
 ).to(device)
 
 
-def apply_paraphrase(text: str, ratio: float = 1.0) -> str:
+def apply_paraphrase(text: str, ratio: float = 1.0, mode: str = "random") -> str:
     """
     Paraphrase text with T5-small.
     
     Args:
         text: Text to paraphrase
-        ratio: Fraction of sentences to paraphrase (0.05, 0.10, 0.15, or 1.0 for all)
+        ratio: Fraction of sentences to paraphrase (0.05, 0.10, 0.15, 0.20)
+        mode: Selection mode - "start", "middle", "end", or "random"
     
     Returns:
         Paraphrased text
@@ -54,26 +55,7 @@ def apply_paraphrase(text: str, ratio: float = 1.0) -> str:
     if not text.strip():
         return text
     
-    # If ratio is 1.0, paraphrase entire text (original behavior)
-    if ratio >= 1.0:
-        inputs = paraphraser_tokenizer(
-            text,
-            return_tensors="pt",
-            truncation=True,
-        ).to(device)
-        max_len = max(1, int(inputs["input_ids"].shape[1] * 1.4))
-
-        with torch.no_grad():
-            outputs = paraphraser_model.generate(
-                **inputs,
-                num_beams=4,
-                do_sample=False,
-                max_length=max_len,
-            )
-
-        return paraphraser_tokenizer.decode(outputs[0], skip_special_tokens=True)
-    
-    # Otherwise, paraphrase only a percentage of sentences
+    # Parse sentences
     try:
         sentences = nltk.sent_tokenize(text)
     except Exception as e:
@@ -87,7 +69,21 @@ def apply_paraphrase(text: str, ratio: float = 1.0) -> str:
     
     num_sentences = len(sentences)
     num_to_paraphrase = max(1, int(num_sentences * ratio))
-    indices_to_paraphrase = random.sample(range(num_sentences), min(num_to_paraphrase, num_sentences))
+    
+    # Select indices based on mode
+    if mode == "start":
+        indices_to_paraphrase = list(range(min(num_to_paraphrase, num_sentences)))
+    elif mode == "end":
+        indices_to_paraphrase = list(range(max(0, num_sentences - num_to_paraphrase), num_sentences))
+    elif mode == "middle":
+        center = num_sentences // 2
+        start_idx = max(0, center - num_to_paraphrase // 2)
+        end_idx = min(num_sentences, start_idx + num_to_paraphrase)
+        indices_to_paraphrase = list(range(start_idx, end_idx))
+    elif mode == "random":
+        indices_to_paraphrase = random.sample(range(num_sentences), min(num_to_paraphrase, num_sentences))
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
     
     paraphrased_sentences = list(sentences)
     for i in indices_to_paraphrase:
@@ -292,41 +288,44 @@ def evaluate_prompt_with_paraphrase(
     except Exception:
         ground_truth_codeword = None
     
-    # Define attack intensities
+    # Define attack variants
     paraphrase_ratios = [0.05, 0.10, 0.15, 0.20]
+    paraphrase_modes = ["start", "middle", "end", "random"]
     
     all_results = []
     
-    # Test each attack intensity
+    # Test each attack variant
     for paraphrase_ratio in paraphrase_ratios:
-        # Apply paraphrasing attack
-        attacked_text = apply_paraphrase(final_text, ratio=paraphrase_ratio)
-        
-        # Detect L-bit codeword on attacked text
-        recovered_codeword = muw.lbw.detect(master_key, attacked_text)
-        
-        # Compute z-score
-        z_score = compute_z_score(muw.lbw, master_key, attacked_text)
-        
-        # Count invalid symbols
-        num_invalid_symbols = count_invalid_symbols(recovered_codeword)
-        
-        # Compute Hamming distance
-        hamming_dist = (
-            hamming_distance(recovered_codeword, ground_truth_codeword)
-            if ground_truth_codeword
-            else float("inf")
-        )
-        
-        result = {
-            "true_user_id": true_user_id,
-            "paraphrase_ratio": paraphrase_ratio,
-            "recovered_codeword": recovered_codeword,
-            "ground_truth_codeword": ground_truth_codeword,
-            "num_invalid_symbols": num_invalid_symbols,
-            "hamming_distance": hamming_dist if hamming_dist != float("inf") else None,
-            "z_score": z_score,
-        }
+        for paraphrase_mode in paraphrase_modes:
+            # Apply paraphrasing attack
+            attacked_text = apply_paraphrase(final_text, ratio=paraphrase_ratio, mode=paraphrase_mode)
+            
+            # Detect L-bit codeword on attacked text
+            recovered_codeword = muw.lbw.detect(master_key, attacked_text)
+            
+            # Compute z-score
+            z_score = compute_z_score(muw.lbw, master_key, attacked_text)
+            
+            # Count invalid symbols
+            num_invalid_symbols = count_invalid_symbols(recovered_codeword)
+            
+            # Compute Hamming distance
+            hamming_dist = (
+                hamming_distance(recovered_codeword, ground_truth_codeword)
+                if ground_truth_codeword
+                else float("inf")
+            )
+            
+            result = {
+                "true_user_id": true_user_id,
+                "paraphrase_ratio": paraphrase_ratio,
+                "paraphrase_mode": paraphrase_mode,
+                "recovered_codeword": recovered_codeword,
+                "ground_truth_codeword": ground_truth_codeword,
+                "num_invalid_symbols": num_invalid_symbols,
+                "hamming_distance": hamming_dist if hamming_dist != float("inf") else None,
+                "z_score": z_score,
+            }
         
         if scheme == "naive":
             detected_user_id = decode_naive_user(muw, recovered_codeword)
@@ -786,7 +785,8 @@ def main():
 
     print(f"\n[3/4] Processing {len(prompts)} prompts with paraphrasing attacks...")
     print(f"  → Testing intensities: 5%, 10%, 15%, 20%")
-    print(f"  → Total attack variants per prompt: 4")
+    print(f"  → Testing modes: start, middle, end, random")
+    print(f"  → Total attack variants per prompt: 16")
     all_results = []
 
     for prompt_idx, prompt in enumerate(tqdm(prompts, desc="Processing prompts", unit="prompt")):
@@ -830,9 +830,10 @@ def main():
         "group_bits": args.group_bits if args.scheme == "hierarchical" else None,
         "user_bits": args.user_bits if args.scheme == "hierarchical" else None,
         "num_prompts": len(prompts),
-        "num_attack_variants_per_prompt": 4,
+        "num_attack_variants_per_prompt": 16,
         "total_attack_results": len(all_results),
         "paraphrase_ratios": [0.05, 0.10, 0.15, 0.20],
+        "paraphrase_modes": ["start", "middle", "end", "random"],
         "random_seed": seed,
         "output_directory": scheme_output_dir,
         "raw_results_file": os.path.basename(raw_results_path) if raw_results_path else None,

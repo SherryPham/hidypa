@@ -203,6 +203,57 @@ def sample_2_same_1_diff(muw) -> list[int]:
     return sorted(users_from_group + [user_from_other])
 
 
+def get_group_info(muw) -> dict:
+    """
+    Get information about available groups for the multi-user watermarker.
+    
+    Args:
+        muw: Multi-user watermarker instance
+    
+    Returns:
+        Dictionary with group information including:
+        - num_groups: Number of distinct groups
+        - group_to_users: Mapping of group_id to list of user IDs
+        - can_run_cross_group_2: Whether 2-colluder cross-group case can run
+        - can_run_cross_group_3: Whether 3-colluder cross-group case can run
+        - can_run_mixed: Whether mixed 2same_1diff case can run
+    """
+    if not hasattr(muw, 'user_to_group') or muw.user_to_group is None:
+        # Naive scheme: all users are independent, all cases can run
+        return {
+            'num_groups': None,  # Not applicable for naive
+            'group_to_users': None,
+            'can_run_cross_group_2': True,
+            'can_run_cross_group_3': True,
+            'can_run_mixed': True
+        }
+    
+    # Hierarchical scheme: analyze groups
+    group_to_users = {}
+    for user_id, group_id in muw.user_to_group.items():
+        if group_id not in group_to_users:
+            group_to_users[group_id] = []
+        group_to_users[group_id].append(user_id)
+    
+    num_groups = len(group_to_users)
+    
+    # Check which cases can run
+    can_run_cross_group_2 = num_groups >= 2
+    can_run_cross_group_3 = num_groups >= 3
+    
+    # For mixed case: need at least 2 groups, with at least one having 2+ users
+    groups_with_2plus = [gid for gid, users in group_to_users.items() if len(users) >= 2]
+    can_run_mixed = num_groups >= 2 and len(groups_with_2plus) >= 1
+    
+    return {
+        'num_groups': num_groups,
+        'group_to_users': group_to_users,
+        'can_run_cross_group_2': can_run_cross_group_2,
+        'can_run_cross_group_3': can_run_cross_group_3,
+        'can_run_mixed': can_run_mixed
+    }
+
+
 def save_raw_results(records: list[dict], output_path: str):
     """Persist full prompt-level collusion results as gzipped JSON Lines."""
     if not records:
@@ -642,6 +693,25 @@ def main():
     
     print(f"  Loaded {muw.N} users")
     
+    # Get group information to determine which cases can run
+    group_info = get_group_info(muw)
+    
+    # Log warnings once at the start if cases need to be skipped
+    if args.scheme == 'hierarchical':
+        print(f"\n  Group structure: {group_info['num_groups']} groups available")
+        skipped_cases = []
+        if not group_info['can_run_cross_group_2']:
+            skipped_cases.append("2-colluder cross-group (needs 2+ groups)")
+        if not group_info['can_run_cross_group_3']:
+            skipped_cases.append("3-colluder cross-group (needs 3+ groups)")
+        if not group_info['can_run_mixed']:
+            skipped_cases.append("3-colluder mixed (needs 2+ groups with at least one having 2+ users)")
+        
+        if skipped_cases:
+            print(f"  Warning: Skipping the following collusion cases due to insufficient groups:")
+            for case in skipped_cases:
+                print(f"    - {case}")
+    
     # Generate master key
     master_key = muw.keygen()
     
@@ -664,57 +734,70 @@ def main():
         }
         
         # 2 colluders cases
+        # same_group_2 - always possible (just need 1 group with 2+ users)
         try:
-            # same_group_2
             colluders_same_2 = sample_same_group(muw, 2)
             result_same_2 = evaluate_collusion_case(
                 muw, master_key, prompt, colluders_same_2,
                 'same_group_2', args.max_new_tokens, args.model
             )
             prompt_results['results']['same_group_2'] = result_same_2
-            
-            # cross_group_2
-            colluders_cross_2 = sample_different_groups(muw, 2)
-            result_cross_2 = evaluate_collusion_case(
-                muw, master_key, prompt, colluders_cross_2,
-                'cross_group_2', args.max_new_tokens, args.model
-            )
-            prompt_results['results']['cross_group_2'] = result_cross_2
         except Exception as e:
-            print(f"\n  Warning: Error processing 2-colluder cases for prompt {prompt_idx}: {e}")
             prompt_results['results']['same_group_2'] = {'error': str(e)}
-            prompt_results['results']['cross_group_2'] = {'error': str(e)}
+        
+        # cross_group_2 - only if we have 2+ groups
+        if group_info['can_run_cross_group_2']:
+            try:
+                colluders_cross_2 = sample_different_groups(muw, 2)
+                result_cross_2 = evaluate_collusion_case(
+                    muw, master_key, prompt, colluders_cross_2,
+                    'cross_group_2', args.max_new_tokens, args.model
+                )
+                prompt_results['results']['cross_group_2'] = result_cross_2
+            except Exception as e:
+                prompt_results['results']['cross_group_2'] = {'error': str(e)}
+        else:
+            prompt_results['results']['cross_group_2'] = {'skipped': 'Insufficient groups (need 2+)'}
         
         # 3 colluders cases
+        # same_group_3 - always possible (just need 1 group with 3+ users)
         try:
-            # same_group_3
             colluders_same_3 = sample_same_group(muw, 3)
             result_same_3 = evaluate_collusion_case(
                 muw, master_key, prompt, colluders_same_3,
                 'same_group_3', args.max_new_tokens, args.model
             )
             prompt_results['results']['same_group_3'] = result_same_3
-            
-            # cross_group_3
-            colluders_cross_3 = sample_different_groups(muw, 3)
-            result_cross_3 = evaluate_collusion_case(
-                muw, master_key, prompt, colluders_cross_3,
-                'cross_group_3', args.max_new_tokens, args.model
-            )
-            prompt_results['results']['cross_group_3'] = result_cross_3
-            
-            # mixed_2same_1diff
-            colluders_mixed = sample_2_same_1_diff(muw)
-            result_mixed = evaluate_collusion_case(
-                muw, master_key, prompt, colluders_mixed,
-                'mixed_2same_1diff', args.max_new_tokens, args.model
-            )
-            prompt_results['results']['mixed_2same_1diff'] = result_mixed
         except Exception as e:
-            print(f"\n  Warning: Error processing 3-colluder cases for prompt {prompt_idx}: {e}")
             prompt_results['results']['same_group_3'] = {'error': str(e)}
-            prompt_results['results']['cross_group_3'] = {'error': str(e)}
-            prompt_results['results']['mixed_2same_1diff'] = {'error': str(e)}
+        
+        # cross_group_3 - only if we have 3+ groups
+        if group_info['can_run_cross_group_3']:
+            try:
+                colluders_cross_3 = sample_different_groups(muw, 3)
+                result_cross_3 = evaluate_collusion_case(
+                    muw, master_key, prompt, colluders_cross_3,
+                    'cross_group_3', args.max_new_tokens, args.model
+                )
+                prompt_results['results']['cross_group_3'] = result_cross_3
+            except Exception as e:
+                prompt_results['results']['cross_group_3'] = {'error': str(e)}
+        else:
+            prompt_results['results']['cross_group_3'] = {'skipped': 'Insufficient groups (need 3+)'}
+        
+        # mixed_2same_1diff - only if we have 2+ groups with at least one having 2+ users
+        if group_info['can_run_mixed']:
+            try:
+                colluders_mixed = sample_2_same_1_diff(muw)
+                result_mixed = evaluate_collusion_case(
+                    muw, master_key, prompt, colluders_mixed,
+                    'mixed_2same_1diff', args.max_new_tokens, args.model
+                )
+                prompt_results['results']['mixed_2same_1diff'] = result_mixed
+            except Exception as e:
+                prompt_results['results']['mixed_2same_1diff'] = {'error': str(e)}
+        else:
+            prompt_results['results']['mixed_2same_1diff'] = {'skipped': 'Insufficient groups (need 2+ groups with at least one having 2+ users)'}
         
         all_results.append(prompt_results)
     
@@ -737,7 +820,9 @@ def main():
         case_results = [
             r['results'].get(case_type, {}) 
             for r in all_results 
-            if case_type in r['results'] and 'error' not in r['results'][case_type]
+            if case_type in r['results'] 
+            and 'error' not in r['results'][case_type]
+            and 'skipped' not in r['results'][case_type]
         ]
         if case_results:
             successful = sum(1 for r in case_results if r.get('success', False))
@@ -756,7 +841,9 @@ def main():
         case_results = [
             r['results'].get(case_type, {}) 
             for r in all_results 
-            if case_type in r['results'] and 'error' not in r['results'][case_type]
+            if case_type in r['results'] 
+            and 'error' not in r['results'][case_type]
+            and 'skipped' not in r['results'][case_type]
         ]
         if case_results:
             successful = sum(1 for r in case_results if r.get('success', False))

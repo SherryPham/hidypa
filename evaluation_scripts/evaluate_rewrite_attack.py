@@ -33,7 +33,7 @@ from src.fingerprinting import generate_user_fingerprint
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def apply_llm_rewrite(model, tokenizer, text, max_new_tokens=512, ratio: float = 1.0):
+def apply_llm_rewrite(model, tokenizer, text, max_new_tokens=512, ratio: float = 1.0, mode: str = "random"):
     """
     Rewrite text using LLM.
     
@@ -42,36 +42,13 @@ def apply_llm_rewrite(model, tokenizer, text, max_new_tokens=512, ratio: float =
         tokenizer: Tokenizer for the model
         text: Text to rewrite
         max_new_tokens: Maximum tokens to generate
-        ratio: Fraction of sentences to rewrite (0.05, 0.10, 0.15, or 1.0 for all)
+        ratio: Fraction of sentences to rewrite (0.05, 0.10, 0.15, 0.20)
+        mode: Selection mode - "start", "middle", "end", or "random"
     
     Returns:
         Rewritten text
     """
-    # If ratio is 1.0, rewrite entire text (original behavior)
-    if ratio >= 1.0:
-        prompt = f"Rewrite the following text in your own words, keeping the same meaning:\n{text}\nRewrite:"
-        input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
-
-        attention_mask = torch.ones_like(input_ids)
-
-        with torch.no_grad():
-            output_ids = model.generate(
-                input_ids,
-                max_new_tokens=max_new_tokens,
-                do_sample=False,   # deterministic greedy decoding
-                attention_mask=attention_mask,
-                pad_token_id=tokenizer.eos_token_id if tokenizer.eos_token_id is not None else tokenizer.pad_token_id,
-            )
-
-        rewritten = tokenizer.decode(output_ids[0], skip_special_tokens=True).strip()
-
-        # remove the instruction/prompt portion
-        if rewritten.startswith(prompt):
-            rewritten = rewritten[len(prompt):].strip()
-
-        return rewritten if rewritten else text
-    
-    # Otherwise, rewrite only a percentage of sentences
+    # Parse sentences
     try:
         sentences = nltk.sent_tokenize(text)
     except Exception as e:
@@ -85,7 +62,21 @@ def apply_llm_rewrite(model, tokenizer, text, max_new_tokens=512, ratio: float =
     
     num_sentences = len(sentences)
     num_to_rewrite = max(1, int(num_sentences * ratio))
-    indices_to_rewrite = random.sample(range(num_sentences), min(num_to_rewrite, num_sentences))
+    
+    # Select indices based on mode
+    if mode == "start":
+        indices_to_rewrite = list(range(min(num_to_rewrite, num_sentences)))
+    elif mode == "end":
+        indices_to_rewrite = list(range(max(0, num_sentences - num_to_rewrite), num_sentences))
+    elif mode == "middle":
+        center = num_sentences // 2
+        start_idx = max(0, center - num_to_rewrite // 2)
+        end_idx = min(num_sentences, start_idx + num_to_rewrite)
+        indices_to_rewrite = list(range(start_idx, end_idx))
+    elif mode == "random":
+        indices_to_rewrite = random.sample(range(num_sentences), min(num_to_rewrite, num_sentences))
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
     
     rewritten_sentences = list(sentences)
     for i in indices_to_rewrite:
@@ -301,44 +292,47 @@ def evaluate_prompt_with_rewrite_attack(
     except Exception:
         ground_truth_codeword = None
     
-    # Define attack intensities
+    # Define attack variants
     rewrite_ratios = [0.05, 0.10, 0.15, 0.20]
+    rewrite_modes = ["start", "middle", "end", "random"]
     
     all_results = []
     
-    # Test each attack intensity
+    # Test each attack variant
     for rewrite_ratio in rewrite_ratios:
-        # Apply rewrite attack
-        attacked_text = apply_llm_rewrite(
-            rewrite_model, rewrite_tokenizer, final_text, 
-            max_new_tokens=max_new_tokens, ratio=rewrite_ratio
-        )
-        
-        # Detect L-bit codeword on attacked text
-        recovered_codeword = muw.lbw.detect(master_key, attacked_text)
-        
-        # Compute z-score
-        z_score = compute_z_score(muw.lbw, master_key, attacked_text)
-        
-        # Count invalid symbols
-        num_invalid_symbols = count_invalid_symbols(recovered_codeword)
-        
-        # Compute Hamming distance
-        hamming_dist = (
-            hamming_distance(recovered_codeword, ground_truth_codeword)
-            if ground_truth_codeword
-            else float("inf")
-        )
-        
-        result = {
-            "true_user_id": true_user_id,
-            "rewrite_ratio": rewrite_ratio,
-            "recovered_codeword": recovered_codeword,
-            "ground_truth_codeword": ground_truth_codeword,
-            "num_invalid_symbols": num_invalid_symbols,
-            "hamming_distance": hamming_dist if hamming_dist != float("inf") else None,
-            "z_score": z_score,
-        }
+        for rewrite_mode in rewrite_modes:
+            # Apply rewrite attack
+            attacked_text = apply_llm_rewrite(
+                rewrite_model, rewrite_tokenizer, final_text, 
+                max_new_tokens=max_new_tokens, ratio=rewrite_ratio, mode=rewrite_mode
+            )
+            
+            # Detect L-bit codeword on attacked text
+            recovered_codeword = muw.lbw.detect(master_key, attacked_text)
+            
+            # Compute z-score
+            z_score = compute_z_score(muw.lbw, master_key, attacked_text)
+            
+            # Count invalid symbols
+            num_invalid_symbols = count_invalid_symbols(recovered_codeword)
+            
+            # Compute Hamming distance
+            hamming_dist = (
+                hamming_distance(recovered_codeword, ground_truth_codeword)
+                if ground_truth_codeword
+                else float("inf")
+            )
+            
+            result = {
+                "true_user_id": true_user_id,
+                "rewrite_ratio": rewrite_ratio,
+                "rewrite_mode": rewrite_mode,
+                "recovered_codeword": recovered_codeword,
+                "ground_truth_codeword": ground_truth_codeword,
+                "num_invalid_symbols": num_invalid_symbols,
+                "hamming_distance": hamming_dist if hamming_dist != float("inf") else None,
+                "z_score": z_score,
+            }
         
         if scheme == "naive":
             detected_user_id = decode_naive_user(muw, recovered_codeword)
@@ -802,7 +796,8 @@ def main():
 
     print(f"\n[3/4] Processing {len(prompts)} prompts with rewrite attacks...")
     print(f"  → Testing intensities: 5%, 10%, 15%, 20%")
-    print(f"  → Total attack variants per prompt: 4")
+    print(f"  → Testing modes: start, middle, end, random")
+    print(f"  → Total attack variants per prompt: 16")
     all_results = []
 
     for prompt_idx, prompt in enumerate(tqdm(prompts, desc="Processing prompts", unit="prompt")):
@@ -848,9 +843,10 @@ def main():
         "group_bits": args.group_bits if args.scheme == "hierarchical" else None,
         "user_bits": args.user_bits if args.scheme == "hierarchical" else None,
         "num_prompts": len(prompts),
-        "num_attack_variants_per_prompt": 4,
+        "num_attack_variants_per_prompt": 16,
         "total_attack_results": len(all_results),
         "rewrite_ratios": [0.05, 0.10, 0.15, 0.20],
+        "rewrite_modes": ["start", "middle", "end", "random"],
         "random_seed": seed,
         "output_directory": scheme_output_dir,
         "raw_results_file": os.path.basename(raw_results_path) if raw_results_path else None,
