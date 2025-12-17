@@ -1,0 +1,31 @@
+{
+  "scheme": "hierarchical",
+  "model": "gpt2",
+  "run_tag": "job_7883060",
+  "l_bits": 8,
+  "group_bits": 2,
+  "user_bits": 6,
+  "num_prompts": 200,
+  "num_attack_variants_per_prompt": 3,
+  "total_attack_results": 600,
+  "rewrite_ratios": [
+    0.05,
+    0.1,
+    0.15
+  ],
+  "random_seed": 670051067,
+  "output_directory": "/fred/oz411/kpham/crypto-watermark/evaluation/rewrite_attack/hierarchical/G2_U6/job_7883060",
+  "raw_results_file": null,
+  "generated_utc": "2025-12-16T17:13:38.946761Z",
+  "metrics": {
+    "group_accuracy": 0.7833333333333333,
+    "user_accuracy": 0.40425531914893614,
+    "full_identity_accuracy": 0.31666666666666665,
+    "lbit_accuracy": 0.10166666666666667,
+    "false_positive_rate": 0.45666666666666667,
+    "false_negative_rate": 0.22666666666666666,
+    "avg_invalid_symbols": 3.0833333333333335,
+    "avg_hamming_distance": 0.0033333333333333335,
+    "avg_z_score": 4.301306214747213
+  }
+}
