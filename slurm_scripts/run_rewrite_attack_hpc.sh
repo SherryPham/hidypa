@@ -8,7 +8,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --time=24:00:00
+#SBATCH --time=64:00:00
 #SBATCH --output=slurm_out/slurm-%j.out
 module --force purge
 module load apptainer
@@ -65,7 +65,7 @@ run_eval () {
             --scheme naive \
             --l-bits 8 \
             --prompts-file assets/prompts.txt \
-            --num-prompts 200 \
+            --num-prompts 300 \
             --users-file assets/users.csv \
             --model gpt2 \
             --delta 3.5 \
@@ -82,7 +82,7 @@ run_eval () {
             --user-bits "${user_bits}" \
             --l-bits 8 \
             --prompts-file assets/prompts.txt \
-            --num-prompts 200 \
+            --num-prompts 300 \
             --users-file assets/users.csv \
             --model gpt2 \
             --delta 3.5 \

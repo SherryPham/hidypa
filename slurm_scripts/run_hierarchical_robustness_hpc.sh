@@ -8,7 +8,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --time=24:00:00
+#SBATCH --time=64:00:00
 #SBATCH --output=slurm_out/slurm-%j.out
 module --force purge
 module load apptainer
@@ -57,7 +57,7 @@ run_py evaluation_scripts/evaluate_hierarchical_robustness.py \
     --scheme naive \
     --l-bits 8 \
     --prompts-file assets/prompts.txt \
-    --num-prompts 200 \
+    --num-prompts 300 \
     --users-file assets/users.csv \
     --model gpt2 \
     --delta 3.5 \
@@ -79,7 +79,7 @@ run_py evaluation_scripts/evaluate_hierarchical_robustness.py \
     --user-bits 7 \
     --l-bits 8 \
     --prompts-file assets/prompts.txt \
-    --num-prompts 200 \
+    --num-prompts 300 \
     --users-file assets/users.csv \
     --model gpt2 \
     --delta 3.5 \
@@ -101,7 +101,7 @@ run_py evaluation_scripts/evaluate_hierarchical_robustness.py \
     --user-bits 6 \
     --l-bits 8 \
     --prompts-file assets/prompts.txt \
-    --num-prompts 200 \
+    --num-prompts 300 \
     --users-file assets/users.csv \
     --model gpt2 \
     --delta 3.5 \
@@ -123,7 +123,7 @@ run_py evaluation_scripts/evaluate_hierarchical_robustness.py \
     --user-bits 5 \
     --l-bits 8 \
     --prompts-file assets/prompts.txt \
-    --num-prompts 200 \
+    --num-prompts 300 \
     --users-file assets/users.csv \
     --model gpt2 \
     --delta 3.5 \
@@ -145,7 +145,7 @@ run_py evaluation_scripts/evaluate_hierarchical_robustness.py \
     --user-bits 4 \
     --l-bits 8 \
     --prompts-file assets/prompts.txt \
-    --num-prompts 200 \
+    --num-prompts 300 \
     --users-file assets/users.csv \
     --model gpt2 \
     --delta 3.5 \
@@ -167,7 +167,7 @@ run_py evaluation_scripts/evaluate_hierarchical_robustness.py \
     --user-bits 3 \
     --l-bits 8 \
     --prompts-file assets/prompts.txt \
-    --num-prompts 200 \
+    --num-prompts 300 \
     --users-file assets/users.csv \
     --model gpt2 \
     --delta 3.5 \
@@ -189,7 +189,7 @@ run_py evaluation_scripts/evaluate_hierarchical_robustness.py \
     --user-bits 2 \
     --l-bits 8 \
     --prompts-file assets/prompts.txt \
-    --num-prompts 200 \
+    --num-prompts 300 \
     --users-file assets/users.csv \
     --model gpt2 \
     --delta 3.5 \
@@ -211,7 +211,7 @@ run_py evaluation_scripts/evaluate_hierarchical_robustness.py \
     --user-bits 1 \
     --l-bits 8 \
     --prompts-file assets/prompts.txt \
-    --num-prompts 200 \
+    --num-prompts 300 \
     --users-file assets/users.csv \
     --model gpt2 \
     --delta 3.5 \
@@ -233,7 +233,7 @@ run_py evaluation_scripts/evaluate_hierarchical_robustness.py \
     --user-bits 0 \
     --l-bits 8 \
     --prompts-file assets/prompts.txt \
-    --num-prompts 200 \
+    --num-prompts 300 \
     --users-file assets/users.csv \
     --model gpt2 \
     --delta 3.5 \
