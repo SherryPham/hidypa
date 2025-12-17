@@ -112,7 +112,11 @@ Cryptographic-Watermarking-for-LLM/
 ├── evaluation_scripts_local/        # Local convenience wrappers for evaluation scripts
 │   ├── run_hierarchical_detection_local.py  # Run hierarchical detection evaluation locally
 │   ├── run_hierarchical_performance_local.py  # Run hierarchical performance evaluation locally
-│   └── run_hierarchical_robustness_local.py  # Run hierarchical robustness evaluation locally
+│   ├── run_hierarchical_robustness_local.py  # Run hierarchical robustness evaluation locally
+│   ├── run_paraphrasing_attack_local.py  # Run paraphrasing attack evaluation locally
+│   ├── run_rewrite_attack_local.py  # Run rewrite attack evaluation locally
+│   ├── run_synonym_attack_local.py  # Run synonym attack evaluation locally
+│   └── run_collusion_resistance_local.py  # Run collusion resistance evaluation locally
 │
 ├── helper_scripts/                  # Analysis and utility scripts
 │   ├── analyse.py                   # Generate plots from evaluation results
@@ -673,6 +677,8 @@ python evaluation_scripts\compare_collusion_resistance.py ^
 - Tests three approaches: naive, min-distance-2, min-distance-3
 - Uses same colluding users across all approaches per prompt (fair comparison)
 - Two combination methods: normal and with deletion
+- **Smart case skipping**: Automatically skips collusion cases that require more groups than available (e.g., skips cross-group tests for G=1, skips 3-colluder cross-group for G=2)
+- **Reduced verbosity**: Logs warnings once per configuration instead of per prompt
 - Generates comparison table, JSON results, per-prompt JSONs, and CSV summary
 - Organized output structure by approach and prompt
 - Supports `--csv-only` mode to rebuild summaries without regenerating text
@@ -758,11 +764,12 @@ python evaluation_scripts/evaluate_paraphrasing_attack.py ^
 ```
 
 **Features:**
-- Mirrors the detection workflow but inserts a T5-small paraphrasing step (beam=4, deterministic) before detection
+- Tests 16 attack variants per prompt: 4 paraphrase ratios (0.05, 0.10, 0.15, 0.20) × 4 modes (start, middle, end, random)
+- Mirrors the robustness workflow but uses T5-small paraphrasing instead of deletion attacks
 - Evaluates naive plus all eight hierarchical splits (G=1,U=7 … G=8,U=0) in a single run
-- Records per-prompt paraphrased text stats: recovered codeword, invalid symbols, Hamming distance, z-score, group/user matches
-- Computes the same metrics as detection (group/user/full accuracy, L-bit accuracy, false positive/negative rates, averages)
-- Saves prompt-level JSONs, consolidated `results.json`, `summary.json`, and a CSV summary per configuration under `evaluation/paraphrasing_attack`
+- Records per-attack variant: paraphrase_ratio, paraphrase_mode, recovered codeword, invalid symbols, Hamming distance, z-score, group/user matches
+- Computes the same metrics as robustness (group/user/full accuracy, L-bit accuracy, false positive/negative rates, averages)
+- Saves all attack results to a single `raw_results.jsonl.gz` file (if enabled) and summary JSON/CSV per configuration under `evaluation/paraphrasing_attack`
 
 #### `evaluation_scripts/evaluate_synonym_attack.py`
 **Purpose:** Evaluate robustness against synonym substitution attacks (WordNet, 10% of tokens) for both naive and hierarchical schemes at L=8
@@ -786,10 +793,11 @@ python evaluation_scripts/evaluate_synonym_attack.py ^
 ```
 
 **Features:**
-- Mirrors the detection workflow but applies a single WordNet-based synonym swap (`ratio=0.1`) after generation
+- Tests 16 attack variants per prompt: 4 synonym ratios (0.05, 0.10, 0.15, 0.20) × 4 modes (start, middle, end, random)
+- Mirrors the robustness workflow but uses WordNet synonym substitution instead of deletion attacks
 - Evaluates naive plus all eight hierarchical splits (G=1,U=7 … G=8,U=0) automatically
-- Records per-prompt stats identical to detection/paraphrasing runs (codewords, invalid symbols, distances, z-scores, group/user matches)
-- Computes the same aggregate metrics and saves `prompt_*.json`, `results.json`, `summary.json`, and `summary.csv` under `evaluation/synonym_attack/<scheme_dir>`
+- Records per-attack variant: synonym_ratio, synonym_mode, recovered codeword, invalid symbols, Hamming distance, z-score, group/user matches
+- Computes the same aggregate metrics as robustness and saves all attack results to `raw_results.jsonl.gz` (if enabled) and summary JSON/CSV under `evaluation/synonym_attack/<scheme_dir>`
 
 #### `evaluation_scripts/evaluate_rewrite_attack.py`
 **Purpose:** Evaluate robustness against full-text rewrites generated deterministically by the same base LLM used for watermarking (GPT-2 / GPT-OSS variants)
@@ -813,10 +821,12 @@ python evaluation_scripts/evaluate_rewrite_attack.py ^
 ```
 
 **Features:**
-- Uses `apply_llm_rewrite` to prompt the same LM to rewrite the generated text deterministically (no sampling) before detection
-- Evaluates naive plus all hierarchical splits, mirroring other Tier A scripts
-- Tracks the same per-prompt metrics (codewords, invalid symbols, Hamming distance, z-scores, group/user matches)
-- Outputs per-prompt JSONs, `results.json`, `summary.json`, and `summary.csv` under `evaluation/rewrite_attack/<scheme_dir>`
+- Tests 16 attack variants per prompt: 4 rewrite ratios (0.05, 0.10, 0.15, 0.20) × 4 modes (start, middle, end, random)
+- Mirrors the robustness workflow but uses LLM-based rewriting instead of deletion attacks
+- Uses `apply_llm_rewrite` to prompt the same LM to rewrite selected sentences deterministically (no sampling) before detection
+- Evaluates naive plus all hierarchical splits, mirroring other attack scripts
+- Records per-attack variant: rewrite_ratio, rewrite_mode, recovered codeword, invalid symbols, Hamming distance, z-score, group/user matches
+- Outputs all attack results to `raw_results.jsonl.gz` (if enabled) and summary JSON/CSV under `evaluation/rewrite_attack/<scheme_dir>`
 
 #### `helper_scripts/analyse.py` (261 lines)
 **Purpose:** Generate plots and statistics from evaluation results
@@ -944,30 +954,118 @@ python evaluation_scripts_local\run_hierarchical_robustness_local.py ^
 
 **Features:**
 - Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits)
-- Tests 16 deletion attack variants per prompt (4 deletion percents × 4 deletion modes)
+- Tests 16 deletion attack variants per prompt (4 deletion percents: 5%, 10%, 15%, 20% × 4 deletion modes: start, middle, end, random)
 - Forwards shared arguments to `evaluate_hierarchical_robustness.py`
-- Generates consolidated summary CSV across all configurations
+- Generates consolidated summary CSV across all configurations with `num_attack_variants_per_prompt` and `total_attack_results` fields
+
+#### `evaluation_scripts_local/run_paraphrasing_attack_local.py`
+**Purpose:** Run all paraphrasing attack evaluations locally (T5-small paraphrasing)
+**Usage:**
+```bat
+python evaluation_scripts_local\run_paraphrasing_attack_local.py ^
+  --prompts-file assets/prompts.txt ^
+  --num-prompts 300 ^
+  --users-file assets/users.csv ^
+  --model gpt2 ^
+  --delta 3.5 ^
+  --entropy-threshold 2.5 ^
+  --hashing-context 5 ^
+  --z-threshold 4.0 ^
+  --max-new-tokens 512 ^
+  --output-dir evaluation/paraphrasing_attack
+```
+
+**Features:**
+- Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits)
+- Tests 16 paraphrasing attack variants per prompt (4 ratios: 5%, 10%, 15%, 20% × 4 modes: start, middle, end, random)
+- Forwards shared arguments to `evaluate_paraphrasing_attack.py`
+- Generates consolidated summary CSV across all configurations with `num_attack_variants_per_prompt` and `total_attack_results` fields
+
+#### `evaluation_scripts_local/run_rewrite_attack_local.py`
+**Purpose:** Run all rewrite attack evaluations locally (LLM-based rewriting)
+**Usage:**
+```bat
+python evaluation_scripts_local\run_rewrite_attack_local.py ^
+  --prompts-file assets/prompts.txt ^
+  --num-prompts 300 ^
+  --users-file assets/users.csv ^
+  --model gpt2 ^
+  --delta 3.5 ^
+  --entropy-threshold 2.5 ^
+  --hashing-context 5 ^
+  --z-threshold 4.0 ^
+  --max-new-tokens 512 ^
+  --output-dir evaluation/rewrite_attack
+```
+
+**Features:**
+- Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits)
+- Tests 16 rewrite attack variants per prompt (4 ratios: 5%, 10%, 15%, 20% × 4 modes: start, middle, end, random)
+- Forwards shared arguments to `evaluate_rewrite_attack.py`
+- Generates consolidated summary CSV across all configurations with `num_attack_variants_per_prompt` and `total_attack_results` fields
+
+#### `evaluation_scripts_local/run_synonym_attack_local.py`
+**Purpose:** Run all synonym substitution attack evaluations locally (WordNet synonym substitution)
+**Usage:**
+```bat
+python evaluation_scripts_local\run_synonym_attack_local.py ^
+  --prompts-file assets/prompts.txt ^
+  --num-prompts 300 ^
+  --users-file assets/users.csv ^
+  --model gpt2 ^
+  --delta 3.5 ^
+  --entropy-threshold 2.5 ^
+  --hashing-context 5 ^
+  --z-threshold 4.0 ^
+  --max-new-tokens 512 ^
+  --output-dir evaluation/synonym_attack
+```
+
+**Features:**
+- Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits)
+- Tests 16 synonym substitution attack variants per prompt (4 ratios: 5%, 10%, 15%, 20% × 4 modes: start, middle, end, random)
+- Forwards shared arguments to `evaluate_synonym_attack.py`
+- Generates consolidated summary CSV across all configurations with `num_attack_variants_per_prompt` and `total_attack_results` fields
 
 ### SLURM Scripts
 
 All scripts in `slurm_scripts/` are HPC cluster batch job scripts for running evaluations.
 
 **Available scripts:**
-- `run_collusion_eval_hpc.sh`: Collusion resistance evaluation
+- `run_collusion_eval_hpc.sh`: Collusion resistance evaluation (300 prompts, 64-hour limit)
 - `run_multiuser_performance_eval_hpc.sh`: Multi-user performance evaluation
 - `run_lbit_sweep_hpc.sh`: L-bit parameter sweep
-- `run_hierarchical_detection_hpc.sh`: Hierarchical detection evaluation
-- `run_hierarchical_robustness_hpc.sh`: Hierarchical robustness evaluation
+- `run_hierarchical_detection_hpc.sh`: Hierarchical detection evaluation (300 prompts, 64-hour limit)
+- `run_hierarchical_robustness_hpc.sh`: Hierarchical robustness evaluation (300 prompts, 16 variants per prompt, 64-hour limit)
+- `run_paraphrasing_attack_hpc.sh`: Paraphrasing attack evaluation (300 prompts, 16 variants per prompt, 64-hour limit)
+- `run_rewrite_attack_hpc.sh`: Rewrite attack evaluation (300 prompts, 16 variants per prompt, 64-hour limit)
+- `run_synonym_attack_hpc.sh`: Synonym substitution attack evaluation (300 prompts, 16 variants per prompt, 64-hour limit)
+
+**Configuration:**
+- All scripts use **300 prompts** per configuration
+- All scripts have **64-hour time limit**
+- Attack scripts (robustness, paraphrasing, rewrite, synonym) test **16 variants per prompt** (4 intensities × 4 modes)
+- All scripts use **Apptainer** containers (no host Python/venv setup needed)
+- All scripts run on **skylake-gpu** partition
 
 **Usage:**
 ```bash
-# Example: Run hierarchical detection evaluation
+# Run hierarchical detection evaluation (9 configurations, 300 prompts each)
 sbatch slurm_scripts/run_hierarchical_detection_hpc.sh
 
-# Or run hierarchical robustness evaluation
+# Run hierarchical robustness evaluation (9 configurations, 300 prompts, 16 variants each)
 sbatch slurm_scripts/run_hierarchical_robustness_hpc.sh
 
-# Or run collusion resistance evaluation
+# Run paraphrasing attack evaluation (9 configurations, 300 prompts, 16 variants each)
+sbatch slurm_scripts/run_paraphrasing_attack_hpc.sh
+
+# Run rewrite attack evaluation (9 configurations, 300 prompts, 16 variants each)
+sbatch slurm_scripts/run_rewrite_attack_hpc.sh
+
+# Run synonym attack evaluation (9 configurations, 300 prompts, 16 variants each)
+sbatch slurm_scripts/run_synonym_attack_hpc.sh
+
+# Run collusion resistance evaluation (9 configurations, 300 prompts each)
 sbatch slurm_scripts/run_collusion_eval_hpc.sh
 ```
 
@@ -1186,27 +1284,35 @@ python -c "import nltk; nltk.download('punkt', download_dir='/shared/nltk_data')
 
 ### Submit Job
 
-Pick the SLURM wrapper that matches your evaluation:
+All SLURM scripts use **Apptainer** containers (no host Python/venv setup needed) and run on the **skylake-gpu** partition with **64-hour time limits**. Pick the SLURM wrapper that matches your evaluation:
 
 ```bash
-# Demo / manual runs
-sbatch slurm_scripts/demonstration.sh
-
-# Hierarchical detection sweep
+# Hierarchical detection evaluation (9 configurations, 300 prompts each)
 sbatch slurm_scripts/run_hierarchical_detection_hpc.sh
 
-# Deletion-robustness sweep
+# Hierarchical robustness evaluation (9 configurations, 300 prompts, 16 variants each)
 sbatch slurm_scripts/run_hierarchical_robustness_hpc.sh
 
-# Paraphrasing (T5-small) attack sweep
+# Paraphrasing attack evaluation (9 configurations, 300 prompts, 16 variants each)
 sbatch slurm_scripts/run_paraphrasing_attack_hpc.sh
 
-# Synonym substitution attack sweep
+# Synonym substitution attack evaluation (9 configurations, 300 prompts, 16 variants each)
 sbatch slurm_scripts/run_synonym_attack_hpc.sh
 
-# Rewrite attack sweep
+# Rewrite attack evaluation (9 configurations, 300 prompts, 16 variants each)
 sbatch slurm_scripts/run_rewrite_attack_hpc.sh
+
+# Collusion resistance evaluation (9 configurations, 300 prompts each)
+sbatch slurm_scripts/run_collusion_eval_hpc.sh
+
+# Multi-user performance evaluation
+sbatch slurm_scripts/run_multiuser_performance_eval_hpc.sh
+
+# L-bit parameter sweep
+sbatch slurm_scripts/run_lbit_sweep_hpc.sh
 ```
+
+**Note:** Attack scripts (robustness, paraphrasing, rewrite, synonym) test 16 variants per prompt (4 intensities × 4 modes: start, middle, end, random), so they take significantly longer than detection-only evaluations.
 ```
 
 ### Monitor Job
