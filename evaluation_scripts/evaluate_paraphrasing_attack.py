@@ -326,34 +326,34 @@ def evaluate_prompt_with_paraphrase(
                 "hamming_distance": hamming_dist if hamming_dist != float("inf") else None,
                 "z_score": z_score,
             }
-        
-        if scheme == "naive":
-            detected_user_id = decode_naive_user(muw, recovered_codeword)
-            result["detected_user_id"] = detected_user_id
-            result["full_identity_match"] = detected_user_id == true_user_id
-            result["lbit_accuracy"] = (
-                recovered_codeword == ground_truth_codeword if ground_truth_codeword else False
-            )
-        else:
-            (
-                detected_group_id,
-                detected_user_id,
-                true_group_id,
-            ) = decode_hierarchical_user(muw, recovered_codeword, true_user_id)
             
-            result["true_group_id"] = true_group_id
-            result["detected_group_id"] = detected_group_id
-            result["detected_user_id"] = detected_user_id
-            result["group_match"] = detected_group_id == true_group_id
-            result["user_match"] = detected_user_id == true_user_id
-            result["full_identity_match"] = (
-                detected_group_id == true_group_id and detected_user_id == true_user_id
-            )
-            result["lbit_accuracy"] = (
-                recovered_codeword == ground_truth_codeword if ground_truth_codeword else False
-            )
-        
-        all_results.append(result)
+            if scheme == "naive":
+                detected_user_id = decode_naive_user(muw, recovered_codeword)
+                result["detected_user_id"] = detected_user_id
+                result["full_identity_match"] = detected_user_id == true_user_id
+                result["lbit_accuracy"] = (
+                    recovered_codeword == ground_truth_codeword if ground_truth_codeword else False
+                )
+            else:
+                (
+                    detected_group_id,
+                    detected_user_id,
+                    true_group_id,
+                ) = decode_hierarchical_user(muw, recovered_codeword, true_user_id)
+                
+                result["true_group_id"] = true_group_id
+                result["detected_group_id"] = detected_group_id
+                result["detected_user_id"] = detected_user_id
+                result["group_match"] = detected_group_id == true_group_id
+                result["user_match"] = detected_user_id == true_user_id
+                result["full_identity_match"] = (
+                    detected_group_id == true_group_id and detected_user_id == true_user_id
+                )
+                result["lbit_accuracy"] = (
+                    recovered_codeword == ground_truth_codeword if ground_truth_codeword else False
+                )
+            
+            all_results.append(result)
     
     return all_results
 

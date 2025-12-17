@@ -78,6 +78,29 @@ def apply_llm_rewrite(model, tokenizer, text, max_new_tokens=512, ratio: float =
     else:
         raise ValueError(f"Unknown mode: {mode}")
     
+    # Get model's max position embeddings (1024 for GPT-2)
+    max_position_embeddings = getattr(model.config, 'max_position_embeddings', 1024)
+    
+    # Tokenize the instruction prefix to know its length
+    # We'll encode a dummy prompt to see how many special tokens are added
+    instruction_prefix = "Rewrite the following text in your own words, keeping the same meaning:\n"
+    instruction_suffix = "\nRewrite:"
+    
+    # Check how many special tokens are added when encoding
+    dummy_text = "test"
+    dummy_with_special = tokenizer.encode(dummy_text, add_special_tokens=True)
+    dummy_without_special = tokenizer.encode(dummy_text, add_special_tokens=False)
+    num_special_tokens = len(dummy_with_special) - len(dummy_without_special)
+    
+    # Tokenize instruction parts without special tokens to get their base length
+    instruction_prefix_ids = tokenizer.encode(instruction_prefix, add_special_tokens=False)
+    instruction_suffix_ids = tokenizer.encode(instruction_suffix, add_special_tokens=False)
+    instruction_tokens = len(instruction_prefix_ids) + len(instruction_suffix_ids)
+    
+    # Reserve tokens: instruction + sentence + special tokens must fit within max_position_embeddings
+    # We need: num_special_tokens + instruction_tokens + sentence_tokens <= max_position_embeddings
+    max_sentence_tokens = max_position_embeddings - instruction_tokens - num_special_tokens - 10  # 10 token safety margin
+    
     rewritten_sentences = list(sentences)
     for i in indices_to_rewrite:
         sentence = sentences[i].strip()
@@ -85,8 +108,26 @@ def apply_llm_rewrite(model, tokenizer, text, max_new_tokens=512, ratio: float =
             continue
         
         try:
-            prompt = f"Rewrite the following text in your own words, keeping the same meaning:\n{sentence}\nRewrite:"
-            input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+            # Tokenize the sentence to check its length
+            sentence_ids = tokenizer.encode(sentence, add_special_tokens=False)
+            
+            # Truncate sentence if it would exceed the context window
+            if len(sentence_ids) > max_sentence_tokens:
+                # Deterministically truncate: take the first max_sentence_tokens tokens
+                sentence_ids = sentence_ids[:max_sentence_tokens]
+                sentence = tokenizer.decode(sentence_ids, skip_special_tokens=True)
+            
+            # Construct the full prompt
+            prompt = f"{instruction_prefix}{sentence}{instruction_suffix}"
+            
+            # Tokenize the full prompt with special tokens (as it will be used in generation)
+            input_ids = tokenizer.encode(prompt, return_tensors="pt", add_special_tokens=True).to(device)
+            
+            # Final safety check: ensure input length doesn't exceed max_position_embeddings
+            if input_ids.shape[1] > max_position_embeddings:
+                # Truncate input_ids to fit (shouldn't happen if truncation above worked, but safety check)
+                input_ids = input_ids[:, :max_position_embeddings]
+            
             attention_mask = torch.ones_like(input_ids)
             
             with torch.no_grad():
@@ -333,34 +374,34 @@ def evaluate_prompt_with_rewrite_attack(
                 "hamming_distance": hamming_dist if hamming_dist != float("inf") else None,
                 "z_score": z_score,
             }
-        
-        if scheme == "naive":
-            detected_user_id = decode_naive_user(muw, recovered_codeword)
-            result["detected_user_id"] = detected_user_id
-            result["full_identity_match"] = detected_user_id == true_user_id
-            result["lbit_accuracy"] = (
-                recovered_codeword == ground_truth_codeword if ground_truth_codeword else False
-            )
-        else:
-            (
-                detected_group_id,
-                detected_user_id,
-                true_group_id,
-            ) = decode_hierarchical_user(muw, recovered_codeword, true_user_id)
             
-            result["true_group_id"] = true_group_id
-            result["detected_group_id"] = detected_group_id
-            result["detected_user_id"] = detected_user_id
-            result["group_match"] = detected_group_id == true_group_id
-            result["user_match"] = detected_user_id == true_user_id
-            result["full_identity_match"] = (
-                detected_group_id == true_group_id and detected_user_id == true_user_id
-            )
-            result["lbit_accuracy"] = (
-                recovered_codeword == ground_truth_codeword if ground_truth_codeword else False
-            )
-        
-        all_results.append(result)
+            if scheme == "naive":
+                detected_user_id = decode_naive_user(muw, recovered_codeword)
+                result["detected_user_id"] = detected_user_id
+                result["full_identity_match"] = detected_user_id == true_user_id
+                result["lbit_accuracy"] = (
+                    recovered_codeword == ground_truth_codeword if ground_truth_codeword else False
+                )
+            else:
+                (
+                    detected_group_id,
+                    detected_user_id,
+                    true_group_id,
+                ) = decode_hierarchical_user(muw, recovered_codeword, true_user_id)
+                
+                result["true_group_id"] = true_group_id
+                result["detected_group_id"] = detected_group_id
+                result["detected_user_id"] = detected_user_id
+                result["group_match"] = detected_group_id == true_group_id
+                result["user_match"] = detected_user_id == true_user_id
+                result["full_identity_match"] = (
+                    detected_group_id == true_group_id and detected_user_id == true_user_id
+                )
+                result["lbit_accuracy"] = (
+                    recovered_codeword == ground_truth_codeword if ground_truth_codeword else False
+                )
+            
+            all_results.append(result)
     
     return all_results
 
