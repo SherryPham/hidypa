@@ -226,7 +226,7 @@ def evaluate_prompt_with_synonym_attack(
         ground_truth_codeword = None
     
     # Define attack intensities
-    synonym_ratios = [0.05, 0.10, 0.15]
+    synonym_ratios = [0.05, 0.10, 0.15, 0.20]
     
     all_results = []
     
@@ -718,8 +718,8 @@ def main():
     master_key = muw.keygen()
 
     print(f"\n[3/4] Processing {len(prompts)} prompts with synonym attacks...")
-    print(f"  → Testing intensities: 5%, 10%, 15%")
-    print(f"  → Total attack variants per prompt: 3")
+    print(f"  → Testing intensities: 5%, 10%, 15%, 20%")
+    print(f"  → Total attack variants per prompt: 4")
     all_results = []
 
     for prompt_idx, prompt in enumerate(tqdm(prompts, desc="Processing prompts", unit="prompt")):
@@ -763,9 +763,9 @@ def main():
         "group_bits": args.group_bits if args.scheme == "hierarchical" else None,
         "user_bits": args.user_bits if args.scheme == "hierarchical" else None,
         "num_prompts": len(prompts),
-        "num_attack_variants_per_prompt": 3,
+        "num_attack_variants_per_prompt": 4,
         "total_attack_results": len(all_results),
-        "synonym_ratios": [0.05, 0.10, 0.15],
+        "synonym_ratios": [0.05, 0.10, 0.15, 0.20],
         "random_seed": seed,
         "output_directory": scheme_output_dir,
         "raw_results_file": os.path.basename(raw_results_path) if raw_results_path else None,

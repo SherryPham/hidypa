@@ -47,7 +47,7 @@ run_py evaluation_scripts/run_lbit_sweep.py \
     --min-l 4 \
     --max-l 30 \
     --delta 3.5 \
-    --entropy-threshold 2.5 \
+    --entropy-threshold 2.5 \   
     --hashing-context 5 \
     --z-threshold 4.0 \
     --max-new-tokens 512 \

@@ -302,6 +302,8 @@ def collect_and_aggregate_summaries(
                 "group_bits": summary.get("group_bits", ""),
                 "user_bits": summary.get("user_bits", ""),
                 "num_prompts": summary.get("num_prompts", ""),
+                "num_attack_variants_per_prompt": summary.get("num_attack_variants_per_prompt", ""),
+                "total_attack_results": summary.get("total_attack_results", ""),
                 "random_seed": summary.get("random_seed", ""),
                 "generated_utc": summary.get("generated_utc", ""),
             }
