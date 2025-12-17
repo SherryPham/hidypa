@@ -1,0 +1,31 @@
+{
+  "scheme": "hierarchical",
+  "model": "gpt2",
+  "run_tag": "job_7883059",
+  "l_bits": 8,
+  "group_bits": 5,
+  "user_bits": 3,
+  "num_prompts": 200,
+  "num_attack_variants_per_prompt": 3,
+  "total_attack_results": 600,
+  "paraphrase_ratios": [
+    0.05,
+    0.1,
+    0.15
+  ],
+  "random_seed": 679238930,
+  "output_directory": "/fred/oz411/kpham/crypto-watermark/evaluation/paraphrasing_attack/hierarchical/G5_U3/job_7883059",
+  "raw_results_file": null,
+  "generated_utc": "2025-12-16T20:04:59.615997Z",
+  "metrics": {
+    "group_accuracy": 0.89,
+    "user_accuracy": 0.9700374531835206,
+    "full_identity_accuracy": 0.8633333333333333,
+    "lbit_accuracy": 0.795,
+    "false_positive_rate": 0.08666666666666667,
+    "false_negative_rate": 0.05,
+    "avg_invalid_symbols": 0.81,
+    "avg_hamming_distance": 0.0,
+    "avg_z_score": 6.3440159222249894
+  }
+}
