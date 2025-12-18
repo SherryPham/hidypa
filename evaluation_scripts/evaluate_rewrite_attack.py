@@ -133,7 +133,7 @@ def apply_llm_rewrite(model, tokenizer, text, max_new_tokens=512, ratio: float =
             with torch.no_grad():
                 output_ids = model.generate(
                     input_ids,
-                    max_new_tokens=min(max_new_tokens, 256),  # Limit for individual sentences
+                    max_new_tokens=max_new_tokens,
                     do_sample=False,
                     attention_mask=attention_mask,
                     pad_token_id=tokenizer.eos_token_id if tokenizer.eos_token_id is not None else tokenizer.pad_token_id,
@@ -170,6 +170,26 @@ def json_default_encoder(obj):
     if isinstance(obj, pd.Series):
         return obj.to_dict()
     return obj
+
+
+def truncate_text_to_context(text: str, tokenizer, max_tokens: int) -> str:
+    """
+    Truncate text to fit within max_tokens.
+    
+    Args:
+        text: Text to truncate
+        tokenizer: Tokenizer to use for encoding/decoding
+        max_tokens: Maximum number of tokens allowed
+    
+    Returns:
+        Truncated text that fits within max_tokens
+    """
+    token_ids = tokenizer.encode(text, add_special_tokens=False)
+    if len(token_ids) <= max_tokens:
+        return text
+    # Deterministically truncate from the end
+    truncated_ids = token_ids[:max_tokens]
+    return tokenizer.decode(truncated_ids, skip_special_tokens=True)
 
 
 def compute_z_score(lbw, master_key, text):
@@ -323,8 +343,31 @@ def evaluate_prompt_with_rewrite_attack(
     Returns:
         List of dictionaries with evaluation results (one per attack intensity)
     """
-    # Embed watermark once
-    raw_text = muw.embed(master_key, true_user_id, prompt, max_new_tokens=max_new_tokens)
+    # Get tokenizer and model context limit
+    tokenizer = muw.lbw.model.tokenizer
+    max_position_embeddings = getattr(muw.lbw.model._model.config, 'max_position_embeddings', 1024)
+    safety_margin = 10  # Small buffer for special tokens
+    
+    # Before embedding: ensure prompt + max_new_tokens fits within context
+    prompt_ids = tokenizer.encode(prompt, add_special_tokens=False)
+    prompt_len = len(prompt_ids)
+    
+    # Calculate effective max_new_tokens for this prompt
+    effective_max_new_tokens = max_new_tokens
+    if prompt_len + max_new_tokens > max_position_embeddings - safety_margin:
+        # First, try reducing max_new_tokens
+        available_for_generation = max_position_embeddings - safety_margin - prompt_len
+        if available_for_generation >= 64:  # Minimum viable generation length
+            effective_max_new_tokens = available_for_generation
+        else:
+            # Truncate prompt to allow at least 64 tokens for generation
+            max_prompt_len = max_position_embeddings - safety_margin - 64
+            prompt_ids = prompt_ids[:max_prompt_len]
+            prompt = tokenizer.decode(prompt_ids, skip_special_tokens=True)
+            effective_max_new_tokens = 64
+    
+    # Embed watermark with adjusted parameters
+    raw_text = muw.embed(master_key, true_user_id, prompt, max_new_tokens=effective_max_new_tokens)
     final_text = parse_final_output(raw_text, model_name)
     
     # Get ground truth codeword
@@ -337,6 +380,9 @@ def evaluate_prompt_with_rewrite_attack(
     rewrite_ratios = [0.05, 0.10, 0.15, 0.20]
     rewrite_modes = ["start", "middle", "end", "random"]
     
+    # Max tokens for detection (slightly less to avoid edge cases)
+    max_detection_tokens = max_position_embeddings - safety_margin
+    
     all_results = []
     
     # Test each attack variant
@@ -345,8 +391,11 @@ def evaluate_prompt_with_rewrite_attack(
             # Apply rewrite attack
             attacked_text = apply_llm_rewrite(
                 rewrite_model, rewrite_tokenizer, final_text, 
-                max_new_tokens=max_new_tokens, ratio=rewrite_ratio, mode=rewrite_mode
+                max_new_tokens=effective_max_new_tokens, ratio=rewrite_ratio, mode=rewrite_mode
             )
+            
+            # Before detection: ensure attacked_text fits within context limit
+            attacked_text = truncate_text_to_context(attacked_text, tokenizer, max_detection_tokens)
             
             # Detect L-bit codeword on attacked text
             recovered_codeword = muw.lbw.detect(master_key, attacked_text)
@@ -833,8 +882,6 @@ def main():
 
     master_key = muw.keygen()
 
-    rewrite_max_tokens = min(args.max_new_tokens, 256)
-
     print(f"\n[3/4] Processing {len(prompts)} prompts with rewrite attacks...")
     print(f"  → Testing intensities: 5%, 10%, 15%, 20%")
     print(f"  → Testing modes: start, middle, end, random")
@@ -851,7 +898,7 @@ def main():
                 true_user_id,
                 args.scheme,
                 args.model,
-                rewrite_max_tokens,
+                args.max_new_tokens,
                 rewrite_model,
                 tokenizer,
             )
