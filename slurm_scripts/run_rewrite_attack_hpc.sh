@@ -72,7 +72,7 @@ run_eval () {
             --entropy-threshold 2.5 \
             --hashing-context 5 \
             --z-threshold 4.0 \
-            --max-new-tokens 512 \
+            --max-new-tokens 256 \
             --output-dir evaluation/rewrite_attack \
             --run-tag ${RUN_TAG}
     else
@@ -89,7 +89,7 @@ run_eval () {
             --entropy-threshold 2.5 \
             --hashing-context 5 \
             --z-threshold 4.0 \
-            --max-new-tokens 512 \
+            --max-new-tokens 256 \
             --output-dir evaluation/rewrite_attack \
             --run-tag ${RUN_TAG}
     fi
