@@ -430,6 +430,42 @@ def compute_metrics(results: list[dict], scheme: str) -> dict:
     return metrics
 
 
+def compute_metrics_by_variant(all_results: list[dict], scheme: str) -> dict:
+    """
+    Compute metrics grouped by variant (deletion_percent, deletion_mode).
+    
+    Args:
+        all_results: List of all per-attack result dictionaries
+        scheme: 'naive' or 'hierarchical'
+    
+    Returns:
+        Dictionary mapping (deletion_percent, deletion_mode) tuples to metrics dicts
+    """
+    from collections import defaultdict
+    
+    # Group results by variant
+    variant_results = defaultdict(list)
+    for result in all_results:
+        deletion_percent = result.get('deletion_percent')
+        deletion_mode = result.get('deletion_mode')
+        if deletion_percent is not None and deletion_mode is not None:
+            variant_key = (deletion_percent, deletion_mode)
+            variant_results[variant_key].append(result)
+    
+    # Compute metrics for each variant
+    metrics_by_variant = {}
+    for (deletion_percent, deletion_mode), results in sorted(variant_results.items()):
+        variant_metrics = compute_metrics(results, scheme)
+        metrics_by_variant[f"{deletion_percent}_{deletion_mode}"] = {
+            'deletion_percent': deletion_percent,
+            'deletion_mode': deletion_mode,
+            'num_results': len(results),
+            **variant_metrics
+        }
+    
+    return metrics_by_variant
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Evaluate robustness to deletion attacks for hierarchical multi-user watermarking",
@@ -781,6 +817,9 @@ def main():
     # Compute metrics
     metrics = compute_metrics(all_results, args.scheme)
     
+    # Compute metrics by variant
+    metrics_by_variant = compute_metrics_by_variant(all_results, args.scheme)
+    
     # Create summary
     summary = {
         'scheme': args.scheme,
@@ -798,7 +837,8 @@ def main():
         'output_directory': scheme_output_dir,
         'raw_results_file': os.path.basename(raw_results_path) if raw_results_path else None,
         'generated_utc': datetime.utcnow().isoformat() + "Z",
-        'metrics': metrics
+        'metrics': metrics,
+        'metrics_by_variant': metrics_by_variant
     }
     
     # Save summary JSON

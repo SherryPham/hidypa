@@ -812,7 +812,7 @@ def main():
     else:
         print("  Raw collusion records not persisted (enable --save-raw-results to store them)")
     
-    # Calculate success rates for 2-colluder cases
+    # Calculate success rates and false positives for 2-colluder cases
     case_types_2 = ['same_group_2', 'cross_group_2']
     success_rates_2 = {}
     
@@ -827,13 +827,28 @@ def main():
         if case_results:
             successful = sum(1 for r in case_results if r.get('success', False))
             total = len(case_results)
+            
+            # Calculate false positives: accused users who weren't original colluders
+            false_positives = 0
+            for r in case_results:
+                trace_result = r.get('trace_result', {})
+                accused_user_ids = set(trace_result.get('accused_user_ids', []))
+                original_user_ids = set(r.get('colluder_ids', []))
+                
+                # False positives are users in accused_user_ids but not in original_user_ids
+                false_positive_users = accused_user_ids - original_user_ids
+                if false_positive_users:
+                    false_positives += len(false_positive_users)
+            
             success_rates_2[case_type] = {
                 'successful': successful,
                 'total': total,
-                'success_rate': (successful / total) * 100.0 if total > 0 else 0.0
+                'success_rate': (successful / total) * 100.0 if total > 0 else 0.0,
+                'false_positives': false_positives,
+                'false_positive_rate': (false_positives / total) * 100.0 if total > 0 else 0.0
             }
     
-    # Calculate success rates for 3-colluder cases
+    # Calculate success rates and false positives for 3-colluder cases
     case_types_3 = ['same_group_3', 'cross_group_3', 'mixed_2same_1diff']
     success_rates_3 = {}
     
@@ -848,10 +863,25 @@ def main():
         if case_results:
             successful = sum(1 for r in case_results if r.get('success', False))
             total = len(case_results)
+            
+            # Calculate false positives: accused users who weren't original colluders
+            false_positives = 0
+            for r in case_results:
+                trace_result = r.get('trace_result', {})
+                accused_user_ids = set(trace_result.get('accused_user_ids', []))
+                original_user_ids = set(r.get('colluder_ids', []))
+                
+                # False positives are users in accused_user_ids but not in original_user_ids
+                false_positive_users = accused_user_ids - original_user_ids
+                if false_positive_users:
+                    false_positives += len(false_positive_users)
+            
             success_rates_3[case_type] = {
                 'successful': successful,
                 'total': total,
-                'success_rate': (successful / total) * 100.0 if total > 0 else 0.0
+                'success_rate': (successful / total) * 100.0 if total > 0 else 0.0,
+                'false_positives': false_positives,
+                'false_positive_rate': (false_positives / total) * 100.0 if total > 0 else 0.0
             }
     
     # Save summary JSON for 2 colluders

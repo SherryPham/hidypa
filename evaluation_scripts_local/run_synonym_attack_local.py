@@ -293,8 +293,8 @@ def collect_and_aggregate_summaries(
             with open(summary_path, "r", encoding="utf-8") as f:
                 summary = json.load(f)
             
-            # Create a flat row
-            row = {
+            # Get base configuration info
+            base_info = {
                 "scheme": summary.get("scheme", ""),
                 "model": summary.get("model", ""),
                 "run_tag": summary.get("run_tag", ""),
@@ -308,12 +308,37 @@ def collect_and_aggregate_summaries(
                 "generated_utc": summary.get("generated_utc", ""),
             }
             
-            # Flatten metrics into the row
-            metrics = summary.get("metrics", {})
-            for metric_name, metric_value in metrics.items():
-                row[metric_name] = metric_value
+            # Check if metrics_by_variant exists
+            metrics_by_variant = summary.get("metrics_by_variant", {})
             
-            rows.append(row)
+            if metrics_by_variant:
+                # Create one row per variant
+                for variant_key, variant_metrics in sorted(metrics_by_variant.items()):
+                    row = base_info.copy()
+                    row["synonym_ratio"] = variant_metrics.get("synonym_ratio", "")
+                    row["synonym_mode"] = variant_metrics.get("synonym_mode", "")
+                    row["num_results"] = variant_metrics.get("num_results", "")
+                    
+                    # Add all metrics for this variant
+                    for metric_name, metric_value in variant_metrics.items():
+                        if metric_name not in ["synonym_ratio", "synonym_mode", "num_results"]:
+                            row[metric_name] = metric_value
+                    
+                    rows.append(row)
+            else:
+                # Fallback: if metrics_by_variant doesn't exist, use aggregated metrics
+                # (for backwards compatibility with old summary.json files)
+                row = base_info.copy()
+                row["synonym_ratio"] = ""
+                row["synonym_mode"] = ""
+                row["num_results"] = ""
+                
+                # Flatten aggregated metrics into the row
+                metrics = summary.get("metrics", {})
+                for metric_name, metric_value in metrics.items():
+                    row[metric_name] = metric_value
+                
+                rows.append(row)
         except Exception as e:
             print(f"  Warning: Failed to load {summary_path}: {e}")
             continue
@@ -325,12 +350,19 @@ def collect_and_aggregate_summaries(
     # Create DataFrame and save
     df = pd.DataFrame(rows)
     
-    # Sort by scheme, then group_bits, then user_bits for consistent ordering
+    # Sort by scheme, then group_bits, then user_bits, then synonym_ratio, then synonym_mode
+    sort_columns = ["scheme"]
     if "group_bits" in df.columns:
-        df = df.sort_values(
-            by=["scheme", "group_bits", "user_bits"],
-            na_position="last",
-        )
+        sort_columns.append("group_bits")
+    if "user_bits" in df.columns:
+        sort_columns.append("user_bits")
+    if "synonym_ratio" in df.columns:
+        sort_columns.append("synonym_ratio")
+    if "synonym_mode" in df.columns:
+        sort_columns.append("synonym_mode")
+    
+    if len(sort_columns) > 1:
+        df = df.sort_values(by=sort_columns, na_position="last")
     
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     df.to_csv(csv_path, index=False)

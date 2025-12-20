@@ -330,6 +330,11 @@ def collect_and_aggregate_summaries(
                     row[f"{case_type}_successful"] = stats.get("successful", "")
                     row[f"{case_type}_total"] = stats.get("total", "")
                     row[f"{case_type}_success_rate"] = stats.get("success_rate", "")
+                    # Store false positives if available
+                    if "false_positives" in stats:
+                        row[f"{case_type}_false_positives"] = stats.get("false_positives", 0)
+                    if "false_positive_rate" in stats:
+                        row[f"{case_type}_false_positive_rate"] = stats.get("false_positive_rate", 0.0)
                 else:
                     row[f"{case_type}_success_rate"] = stats
             
@@ -344,6 +349,138 @@ def collect_and_aggregate_summaries(
     
     # Create DataFrame and save
     df = pd.DataFrame(rows)
+    
+    # Calculate aggregate success rates for each row
+    # 2-colluder cases
+    case_types_2 = ['same_group_2', 'cross_group_2']
+    # 3-colluder cases
+    case_types_3 = ['same_group_3', 'cross_group_3', 'mixed_2same_1diff']
+    
+    # Calculate success rates for each row
+    overall_successful = []
+    overall_total = []
+    success_2_successful = []
+    success_2_total = []
+    success_3_successful = []
+    success_3_total = []
+    
+    for idx, row in df.iterrows():
+        # Overall (all cases)
+        total_successful = 0
+        total_count = 0
+        
+        # 2-colluder cases
+        successful_2 = 0
+        total_2 = 0
+        
+        # 3-colluder cases
+        successful_3 = 0
+        total_3 = 0
+        
+        # Check all case types
+        all_case_types = case_types_2 + case_types_3
+        for case_type in all_case_types:
+            successful_col = f"{case_type}_successful"
+            total_col = f"{case_type}_total"
+            
+            if successful_col in df.columns and total_col in df.columns:
+                successful_val = row.get(successful_col)
+                total_val = row.get(total_col)
+                
+                # Check if values are valid (not NaN, not empty string)
+                if pd.notna(successful_val) and pd.notna(total_val) and successful_val != "" and total_val != "":
+                    try:
+                        successful_val = float(successful_val)
+                        total_val = float(total_val)
+                        total_successful += successful_val
+                        total_count += total_val
+                        
+                        # Add to 2 or 3 colluder totals
+                        if case_type in case_types_2:
+                            successful_2 += successful_val
+                            total_2 += total_val
+                        elif case_type in case_types_3:
+                            successful_3 += successful_val
+                            total_3 += total_val
+                    except (ValueError, TypeError):
+                        pass
+        
+        # Calculate rates
+        overall_successful.append(total_successful)
+        overall_total.append(total_count)
+        success_2_successful.append(successful_2)
+        success_2_total.append(total_2)
+        success_3_successful.append(successful_3)
+        success_3_total.append(total_3)
+    
+    # Add success rate columns to dataframe
+    df['overall_success_rate'] = [
+        (s / t * 100.0) if t > 0 else 0.0 
+        for s, t in zip(overall_successful, overall_total)
+    ]
+    
+    df['success_rate_2_colluders'] = [
+        (s / t * 100.0) if t > 0 else 0.0 
+        for s, t in zip(success_2_successful, success_2_total)
+    ]
+    
+    df['success_rate_3_colluders'] = [
+        (s / t * 100.0) if t > 0 else 0.0 
+        for s, t in zip(success_3_successful, success_3_total)
+    ]
+    
+    # Calculate false positive rates from summary data
+    overall_false_positives = []
+    false_positives_2 = []
+    false_positives_3 = []
+    
+    for idx, row in df.iterrows():
+        # Calculate false positives for 2-colluder cases
+        fp_2 = 0
+        for case_type in case_types_2:
+            fp_col = f"{case_type}_false_positives"
+            if fp_col in df.columns:
+                fp_val = row.get(fp_col)
+                if pd.notna(fp_val) and fp_val != "":
+                    try:
+                        fp_2 += float(fp_val)
+                    except (ValueError, TypeError):
+                        pass
+        
+        # Calculate false positives for 3-colluder cases
+        fp_3 = 0
+        for case_type in case_types_3:
+            fp_col = f"{case_type}_false_positives"
+            if fp_col in df.columns:
+                fp_val = row.get(fp_col)
+                if pd.notna(fp_val) and fp_val != "":
+                    try:
+                        fp_3 += float(fp_val)
+                    except (ValueError, TypeError):
+                        pass
+        
+        # Overall false positives
+        fp_overall = fp_2 + fp_3
+        
+        false_positives_2.append(fp_2)
+        false_positives_3.append(fp_3)
+        overall_false_positives.append(fp_overall)
+    
+    # Add false positive rate columns
+    df['overall_false_positive_rate'] = [
+        (fp / t * 100.0) if t > 0 else 0.0 
+        for fp, t in zip(overall_false_positives, overall_total)
+    ]
+    
+    df['false_positive_rate_2_colluders'] = [
+        (fp / t * 100.0) if t > 0 else 0.0 
+        for fp, t in zip(false_positives_2, success_2_total)
+    ]
+    
+    df['false_positive_rate_3_colluders'] = [
+        (fp / t * 100.0) if t > 0 else 0.0 
+        for fp, t in zip(false_positives_3, success_3_total)
+    ]
     
     # Sort by scheme, then group_bits, then user_bits, then num_colluders for consistent ordering
     sort_columns = ["scheme", "group_bits", "user_bits", "num_colluders"]

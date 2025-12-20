@@ -566,6 +566,42 @@ def compute_metrics(results: list[dict], scheme: str) -> dict:
     return metrics
 
 
+def compute_metrics_by_variant(all_results: list[dict], scheme: str) -> dict:
+    """
+    Compute metrics grouped by variant (rewrite_ratio, rewrite_mode).
+    
+    Args:
+        all_results: List of all per-attack result dictionaries
+        scheme: 'naive' or 'hierarchical'
+    
+    Returns:
+        Dictionary mapping variant keys to metrics dicts
+    """
+    from collections import defaultdict
+    
+    # Group results by variant
+    variant_results = defaultdict(list)
+    for result in all_results:
+        rewrite_ratio = result.get('rewrite_ratio')
+        rewrite_mode = result.get('rewrite_mode')
+        if rewrite_ratio is not None and rewrite_mode is not None:
+            variant_key = (rewrite_ratio, rewrite_mode)
+            variant_results[variant_key].append(result)
+    
+    # Compute metrics for each variant
+    metrics_by_variant = {}
+    for (rewrite_ratio, rewrite_mode), results in sorted(variant_results.items()):
+        variant_metrics = compute_metrics(results, scheme)
+        metrics_by_variant[f"{rewrite_ratio}_{rewrite_mode}"] = {
+            'rewrite_ratio': rewrite_ratio,
+            'rewrite_mode': rewrite_mode,
+            'num_results': len(results),
+            **variant_metrics
+        }
+    
+    return metrics_by_variant
+
+
 def save_raw_results(results: list[dict], output_path: str) -> None:
     """Persist per-prompt rewrite-attack results as gzipped JSON Lines."""
     if not results:
@@ -922,6 +958,9 @@ def main():
 
     print(f"\n[4/4] Computing metrics...")
     metrics = compute_metrics(all_results, args.scheme)
+    
+    # Compute metrics by variant
+    metrics_by_variant = compute_metrics_by_variant(all_results, args.scheme)
 
     summary = {
         "scheme": args.scheme,
@@ -940,6 +979,7 @@ def main():
         "raw_results_file": os.path.basename(raw_results_path) if raw_results_path else None,
         "generated_utc": datetime.utcnow().isoformat() + "Z",
         "metrics": metrics,
+        "metrics_by_variant": metrics_by_variant,
     }
 
     summary_json_path = os.path.join(scheme_output_dir, "summary.json")
