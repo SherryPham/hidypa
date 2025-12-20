@@ -1,0 +1,21 @@
+{
+  "scheme": "hierarchical",
+  "model": "gpt2",
+  "run_tag": "job_7904366",
+  "l_bits": 8,
+  "group_bits": 6,
+  "user_bits": 2,
+  "num_prompts": 300,
+  "random_seed": 799803235,
+  "output_directory": "/fred/oz411/kpham/crypto-watermark/evaluation/hierarchical_detection/hierarchical/G6_U2/job_7904366",
+  "raw_results_file": null,
+  "generated_utc": "2025-12-18T05:04:09.816204Z",
+  "metrics": {
+    "group_accuracy": 0.9266666666666666,
+    "user_accuracy": 0.9856115107913669,
+    "full_identity_accuracy": 0.9133333333333333,
+    "lbit_accuracy": 0.8766666666666667,
+    "false_positive_rate": 0.03,
+    "false_negative_rate": 0.056666666666666664
+  }
+}
