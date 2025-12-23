@@ -674,14 +674,23 @@ python evaluation_scripts\compare_collusion_resistance.py ^
 ```
 
 **Features:**
-- Tests three approaches: naive, min-distance-2, min-distance-3
-- Uses same colluding users across all approaches per prompt (fair comparison)
-- Two combination methods: normal and with deletion
+- Evaluates 9 configurations: naive (L=8) and hierarchical (G=1,U=7 through G=8,U=0)
+- Uses the same sampled colluding users across schemes per prompt (fair comparison)
+- Supports multiple collusion patterns:
+  - 2 colluders: `same_group_2`, `cross_group_2`
+  - 3 colluders: `same_group_3`, `cross_group_3`, `mixed_2same_1diff`
 - **Smart case skipping**: Automatically skips collusion cases that require more groups than available (e.g., skips cross-group tests for G=1, skips 3-colluder cross-group for G=2)
 - **Reduced verbosity**: Logs warnings once per configuration instead of per prompt
-- Generates comparison table, JSON results, per-prompt JSONs, and CSV summary
-- Organized output structure by approach and prompt
-- Supports `--csv-only` mode to rebuild summaries without regenerating text
+- For each configuration and colluder count, saves:
+  - Per‑prompt raw results (optional gzipped JSONL if `--save-raw-results` is enabled)
+  - A `summary.json` in `2_colluders/` and `3_colluders/` with:
+    - `success_rates[case_type].successful` / `total` / `success_rate`
+    - `success_rates[case_type].false_positives` / `false_positive_rate` (accusations of users outside the colluding set)
+- The local wrapper `run_collusion_resistance_local.py` aggregates all `summary.json` files into `evaluation/collusion_resistance/summary_all_configs.csv`, which includes:
+  - Per‑case success counts/rates (same/cross/mixed, 2‑ and 3‑colluder)
+  - Aggregate success rates: `overall_success_rate`, `success_rate_2_colluders`, `success_rate_3_colluders`
+  - Aggregate false‑positive rates: `overall_false_positive_rate`, `false_positive_rate_2_colluders`, `false_positive_rate_3_colluders`
+  - One row per configuration × colluder count (18 rows for naive + 8 hierarchical configs × {2,3} colluders)
 
 #### `evaluation_scripts/evaluate_hierarchical_detection.py`
 **Purpose:** Evaluate pure detection performance (no collusion) for hierarchical multi-user watermarking at L=8, across all allocations of group bits and user bits
@@ -737,9 +746,13 @@ python evaluation_scripts/evaluate_hierarchical_robustness.py ^
 - Same structure as `evaluate_hierarchical_detection.py` but tests robustness to deletion attacks
 - Tests 16 attack variants per prompt: 4 deletion percents (0.05, 0.10, 0.15, 0.20) × 4 deletion modes (start, middle, end, random)
 - For each attack variant: applies deletion, detects codeword, decodes IDs, computes metrics
-- Logs per-attack: deletion_percent, deletion_mode, recovered codeword, Hamming distance, z-scores, match statuses
+- Logs per-attack: `deletion_percent`, `deletion_mode`, recovered codeword, Hamming distance, z-scores, match statuses
 - Computes metrics: group accuracy, user accuracy, full identity accuracy, average invalid symbols, average Hamming distance, average z-score, false positive/negative rates
-- Saves all attack results to a single `results.json` file and summary JSON
+- Saves all attack results to a single `raw_results.jsonl.gz` file (if enabled) plus per‑configuration `summary.json` and `summary.csv`
+  - `summary.json` now contains:
+    - `metrics`: aggregate metrics over all 16 variants
+    - `metrics_by_variant`: metrics for each specific (percent, mode) variant
+  - `summary.csv` stores the aggregate `metrics` as a simple metric/value table for that configuration
 - Supports both naive and hierarchical schemes
 
 #### `evaluation_scripts/evaluate_paraphrasing_attack.py`
@@ -767,9 +780,11 @@ python evaluation_scripts/evaluate_paraphrasing_attack.py ^
 - Tests 16 attack variants per prompt: 4 paraphrase ratios (0.05, 0.10, 0.15, 0.20) × 4 modes (start, middle, end, random)
 - Mirrors the robustness workflow but uses T5-small paraphrasing instead of deletion attacks
 - Evaluates naive plus all eight hierarchical splits (G=1,U=7 … G=8,U=0) in a single run
-- Records per-attack variant: paraphrase_ratio, paraphrase_mode, recovered codeword, invalid symbols, Hamming distance, z-score, group/user matches
+- Records per-attack variant: `paraphrase_ratio`, `paraphrase_mode`, recovered codeword, invalid symbols, Hamming distance, z-score, group/user matches
 - Computes the same metrics as robustness (group/user/full accuracy, L-bit accuracy, false positive/negative rates, averages)
-- Saves all attack results to a single `raw_results.jsonl.gz` file (if enabled) and summary JSON/CSV per configuration under `evaluation/paraphrasing_attack`
+- Saves all attack results to a single `raw_results.jsonl.gz` file (if enabled) and per‑configuration `summary.json` / `summary.csv` under `evaluation/paraphrasing_attack`
+  - `summary.json` contains both aggregate `metrics` and `metrics_by_variant` (metrics for each `(paraphrase_ratio, paraphrase_mode)` pair)
+  - Local aggregation (`run_paraphrasing_attack_local.py`) produces `evaluation/paraphrasing_attack/summary_all_configs.csv` with one row **per variant per configuration** (16 rows per config), including variant columns and all metrics
 
 #### `evaluation_scripts/evaluate_synonym_attack.py`
 **Purpose:** Evaluate robustness against synonym substitution attacks (WordNet, 10% of tokens) for both naive and hierarchical schemes at L=8
@@ -796,8 +811,10 @@ python evaluation_scripts/evaluate_synonym_attack.py ^
 - Tests 16 attack variants per prompt: 4 synonym ratios (0.05, 0.10, 0.15, 0.20) × 4 modes (start, middle, end, random)
 - Mirrors the robustness workflow but uses WordNet synonym substitution instead of deletion attacks
 - Evaluates naive plus all eight hierarchical splits (G=1,U=7 … G=8,U=0) automatically
-- Records per-attack variant: synonym_ratio, synonym_mode, recovered codeword, invalid symbols, Hamming distance, z-score, group/user matches
-- Computes the same aggregate metrics as robustness and saves all attack results to `raw_results.jsonl.gz` (if enabled) and summary JSON/CSV under `evaluation/synonym_attack/<scheme_dir>`
+- Records per-attack variant: `synonym_ratio`, `synonym_mode`, recovered codeword, invalid symbols, Hamming distance, z-score, group/user matches
+- Computes the same aggregate metrics as robustness and saves all attack results to `raw_results.jsonl.gz` (if enabled) and per‑configuration `summary.json` / `summary.csv` under `evaluation/synonym_attack/<scheme_dir>`
+  - `summary.json` contains both aggregate `metrics` and `metrics_by_variant` (metrics for each `(synonym_ratio, synonym_mode)` pair)
+  - Local aggregation (`run_synonym_attack_local.py`) produces `evaluation/synonym_attack/summary_all_configs.csv` with one row **per variant per configuration** (16 rows per config)
 
 #### `evaluation_scripts/evaluate_rewrite_attack.py`
 **Purpose:** Evaluate robustness against full-text rewrites generated deterministically by the same base LLM used for watermarking (GPT-2 / GPT-OSS variants)
@@ -825,8 +842,10 @@ python evaluation_scripts/evaluate_rewrite_attack.py ^
 - Mirrors the robustness workflow but uses LLM-based rewriting instead of deletion attacks
 - Uses `apply_llm_rewrite` to prompt the same LM to rewrite selected sentences deterministically (no sampling) before detection
 - Evaluates naive plus all hierarchical splits, mirroring other attack scripts
-- Records per-attack variant: rewrite_ratio, rewrite_mode, recovered codeword, invalid symbols, Hamming distance, z-score, group/user matches
-- Outputs all attack results to `raw_results.jsonl.gz` (if enabled) and summary JSON/CSV under `evaluation/rewrite_attack/<scheme_dir>`
+- Records per-attack variant: `rewrite_ratio`, `rewrite_mode`, recovered codeword, invalid symbols, Hamming distance, z-score, group/user matches
+- Outputs all attack results to `raw_results.jsonl.gz` (if enabled) and per‑configuration `summary.json` / `summary.csv` under `evaluation/rewrite_attack/<scheme_dir>`
+  - `summary.json` contains both aggregate `metrics` and `metrics_by_variant` (metrics for each `(rewrite_ratio, rewrite_mode)` pair)
+  - Local aggregation (`run_rewrite_attack_local.py`) produces `evaluation/rewrite_attack/summary_all_configs.csv` with one row **per variant per configuration** (16 rows per config)
 
 #### `helper_scripts/analyse.py` (261 lines)
 **Purpose:** Generate plots and statistics from evaluation results
