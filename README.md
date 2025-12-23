@@ -975,7 +975,10 @@ python evaluation_scripts_local\run_hierarchical_robustness_local.py ^
 - Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits)
 - Tests 16 deletion attack variants per prompt (4 deletion percents: 5%, 10%, 15%, 20% × 4 deletion modes: start, middle, end, random)
 - Forwards shared arguments to `evaluate_hierarchical_robustness.py`
-- Generates consolidated summary CSV across all configurations with `num_attack_variants_per_prompt` and `total_attack_results` fields
+- Generates consolidated `evaluation/robustness/summary_all_configs.csv` across all configurations, with:
+  - One row **per variant per configuration** (16 rows per config)
+  - Variant columns (`deletion_percent`, `deletion_mode`) plus all robustness metrics
+  - `num_attack_variants_per_prompt` and `total_attack_results` fields per configuration
 
 #### `evaluation_scripts_local/run_paraphrasing_attack_local.py`
 **Purpose:** Run all paraphrasing attack evaluations locally (T5-small paraphrasing)
@@ -998,7 +1001,10 @@ python evaluation_scripts_local\run_paraphrasing_attack_local.py ^
 - Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits)
 - Tests 16 paraphrasing attack variants per prompt (4 ratios: 5%, 10%, 15%, 20% × 4 modes: start, middle, end, random)
 - Forwards shared arguments to `evaluate_paraphrasing_attack.py`
-- Generates consolidated summary CSV across all configurations with `num_attack_variants_per_prompt` and `total_attack_results` fields
+- Generates consolidated `evaluation/paraphrasing_attack/summary_all_configs.csv` across all configurations, with:
+  - One row **per variant per configuration** (16 rows per config)
+  - Variant columns (`paraphrase_ratio`, `paraphrase_mode`) plus all robustness metrics
+  - `num_attack_variants_per_prompt` and `total_attack_results` fields per configuration
 
 #### `evaluation_scripts_local/run_rewrite_attack_local.py`
 **Purpose:** Run all rewrite attack evaluations locally (LLM-based rewriting)
@@ -1021,7 +1027,10 @@ python evaluation_scripts_local\run_rewrite_attack_local.py ^
 - Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits)
 - Tests 16 rewrite attack variants per prompt (4 ratios: 5%, 10%, 15%, 20% × 4 modes: start, middle, end, random)
 - Forwards shared arguments to `evaluate_rewrite_attack.py`
-- Generates consolidated summary CSV across all configurations with `num_attack_variants_per_prompt` and `total_attack_results` fields
+- Generates consolidated `evaluation/rewrite_attack/summary_all_configs.csv` across all configurations, with:
+  - One row **per variant per configuration** (16 rows per config)
+  - Variant columns (`rewrite_ratio`, `rewrite_mode`) plus all robustness metrics
+  - `num_attack_variants_per_prompt` and `total_attack_results` fields per configuration
 
 #### `evaluation_scripts_local/run_synonym_attack_local.py`
 **Purpose:** Run all synonym substitution attack evaluations locally (WordNet synonym substitution)
@@ -1044,7 +1053,10 @@ python evaluation_scripts_local\run_synonym_attack_local.py ^
 - Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits)
 - Tests 16 synonym substitution attack variants per prompt (4 ratios: 5%, 10%, 15%, 20% × 4 modes: start, middle, end, random)
 - Forwards shared arguments to `evaluate_synonym_attack.py`
-- Generates consolidated summary CSV across all configurations with `num_attack_variants_per_prompt` and `total_attack_results` fields
+- Generates consolidated `evaluation/synonym_attack/summary_all_configs.csv` across all configurations, with:
+  - One row **per variant per configuration** (16 rows per config)
+  - Variant columns (`synonym_ratio`, `synonym_mode`) plus all robustness metrics
+  - `num_attack_variants_per_prompt` and `total_attack_results` fields per configuration
 
 ### SLURM Scripts
 
