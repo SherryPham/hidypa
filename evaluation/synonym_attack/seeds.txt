@@ -1,0 +1,15 @@
+# Random seeds used for synonym attack evaluation
+# Model: gpt2
+# Run tag: job_7963211
+# Generated: 2025-12-20 23:03:26
+# Format: config_name: seed_value
+
+naive_L8: 1000648083
+hierarchical_G1_U7: 1019206041
+hierarchical_G2_U6: 1037841200
+hierarchical_G3_U5: 1057270111
+hierarchical_G4_U4: 1076398285
+hierarchical_G5_U3: 1095479972
+hierarchical_G6_U2: 1114219365
+hierarchical_G7_U1: 1132550331
+hierarchical_G8_U0: 1151443798

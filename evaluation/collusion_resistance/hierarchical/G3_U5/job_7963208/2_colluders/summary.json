@@ -1,0 +1,30 @@
+{
+  "scheme": "hierarchical",
+  "model": "gpt2",
+  "run_tag": "job_7963208",
+  "l_bits": 8,
+  "group_bits": 3,
+  "user_bits": 5,
+  "num_prompts": 300,
+  "random_seed": 1048203922,
+  "output_directory": "/fred/oz411/kpham/crypto-watermark/evaluation/collusion_resistance/hierarchical/G3_U5/job_7963208",
+  "raw_results_file": null,
+  "generated_utc": "2025-12-21T08:43:33.520083Z",
+  "num_colluders": 2,
+  "success_rates": {
+    "same_group_2": {
+      "successful": 298,
+      "total": 300,
+      "success_rate": 99.33333333333333,
+      "false_positives": 0,
+      "false_positive_rate": 0.0
+    },
+    "cross_group_2": {
+      "successful": 286,
+      "total": 300,
+      "success_rate": 95.33333333333334,
+      "false_positives": 0,
+      "false_positive_rate": 0.0
+    }
+  }
+}

@@ -1,0 +1,14 @@
+# Random seeds used for rewrite attack evaluation
+# Model: gpt2
+# Run tag: job_7963210
+# Generated: 2025-12-20 23:00:37
+# Format: config_name: seed_value
+
+naive_L8: 1000478847
+hierarchical_G1_U7: 1026621429
+hierarchical_G2_U6: 1061249670
+hierarchical_G3_U5: 1088080357
+hierarchical_G4_U4: 1116154790
+hierarchical_G5_U3: 1149153022
+hierarchical_G6_U2: 1181888623
+hierarchical_G7_U1: 1208659045

@@ -1,0 +1,15 @@
+# Random seeds used for paraphrasing attack evaluation
+# Model: gpt2
+# Run tag: job_7963209
+# Generated: 2025-12-20 23:00:40
+# Format: config_name: seed_value
+
+naive_L8: 1000481546
+hierarchical_G1_U7: 1019955454
+hierarchical_G2_U6: 1040649135
+hierarchical_G3_U5: 1061122198
+hierarchical_G4_U4: 1081987115
+hierarchical_G5_U3: 1102283432
+hierarchical_G6_U2: 1123920144
+hierarchical_G7_U1: 1143636523
+hierarchical_G8_U0: 1164504326
