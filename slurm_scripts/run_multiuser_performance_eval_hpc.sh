@@ -40,10 +40,17 @@ run_py () {
     --env HF_HUB_OFFLINE=$HF_HUB_OFFLINE \
     "$SIF" python3 "$@"
 }
+
+UNIFIED_SUMMARY="${PROJECT}/evaluation/multiuser_performance/performance_summary.csv"
+
+# Step 1: Run naive baseline once
+echo "=========================================="
+echo "Running Naive Baseline (L=8)"
+echo "=========================================="
 run_py evaluation_scripts/evaluate_multiuser_performance.py \
     --users-file assets/users.csv \
     --model gpt2 \
-    --l-bits 10 \
+    --l-bits 8 \
     --delta 3.5 \
     --entropy-threshold 2.5 \
     --hashing-context 5 \
@@ -52,4 +59,49 @@ run_py evaluation_scripts/evaluate_multiuser_performance.py \
     --prompts-file assets/prompts.txt \
     --max-prompts 300 \
     --user-id 0 \
-    --output-dir evaluation/multiuser_performance
+    --output-dir evaluation/multiuser_performance/naive/L8 \
+    --unified-summary-path "${UNIFIED_SUMMARY}"
+
+# Step 2: Run all hierarchical configs (hierarchical-only)
+GU_CONFIGS=(
+    "1 7"
+    "2 6"
+    "3 5"
+    "4 4"
+    "5 3"
+    "6 2"
+    "7 1"
+    "8 0"
+)
+
+for config in "${GU_CONFIGS[@]}"; do
+    read -r group_bits user_bits <<< "$config"
+    echo ""
+    echo "=========================================="
+    echo "Running Hierarchical G=${group_bits}, U=${user_bits}"
+    echo "=========================================="
+    
+    run_py evaluation_scripts/evaluate_multiuser_performance.py \
+        --users-file assets/users.csv \
+        --model gpt2 \
+        --l-bits 8 \
+        --group-bits "${group_bits}" \
+        --user-bits "${user_bits}" \
+        --delta 3.5 \
+        --entropy-threshold 2.5 \
+        --hashing-context 5 \
+        --z-threshold 4.0 \
+        --max-new-tokens 512 \
+        --prompts-file assets/prompts.txt \
+        --max-prompts 300 \
+        --user-id 0 \
+        --hierarchical-only \
+        --output-dir "evaluation/multiuser_performance/hierarchical/G${group_bits}_U${user_bits}" \
+        --unified-summary-path "${UNIFIED_SUMMARY}"
+done
+
+echo ""
+echo "=========================================="
+echo "All evaluations complete!"
+echo "Unified summary: ${UNIFIED_SUMMARY}"
+echo "=========================================="

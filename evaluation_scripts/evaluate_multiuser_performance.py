@@ -466,6 +466,17 @@ def main():
         default=None,
         help='Path to seeds.txt file to read existing seeds from (optional). If provided and seed exists for this config, it will be reused.'
     )
+    parser.add_argument(
+        '--hierarchical-only',
+        action='store_true',
+        help='If set, only evaluate hierarchical scheme (skip naive baseline)'
+    )
+    parser.add_argument(
+        '--unified-summary-path',
+        type=str,
+        default=None,
+        help='Path to unified summary CSV file to append results to (for aggregating all configs)'
+    )
     
     args = parser.parse_args()
     
@@ -490,11 +501,15 @@ def main():
     print("=" * 80)
     print(f"Model: {args.model}")
     print(f"L-bits: {args.l_bits}")
+    if args.hierarchical_only:
+        print("Mode: Hierarchical-only (naive skipped)")
     if args.group_bits is not None and args.user_bits is not None:
         print(f"Hierarchical: G={args.group_bits}, U={args.user_bits}")
     print(f"User ID: {args.user_id}")
     print(f"Users file: {users_file_path}")
     print(f"Output directory: {output_dir_path}")
+    if args.unified_summary_path:
+        print(f"Unified summary: {args.unified_summary_path}")
     print("=" * 80)
     
     if args.prompt:
@@ -522,7 +537,10 @@ def main():
     lbw = LBitWatermarker(zero_bit_watermarker=zbw, L=args.l_bits)
     
     # Test schemes: naive and hierarchical (if group_bits/user_bits provided)
-    schemes = [('naive', None, None, None)]
+    schemes = []
+    
+    if not args.hierarchical_only:
+        schemes.append(('naive', None, None, None))
     
     if args.group_bits is not None and args.user_bits is not None:
         if args.group_bits + args.user_bits != args.l_bits:
@@ -531,6 +549,9 @@ def main():
                 f"must equal --l-bits ({args.l_bits})"
             )
         schemes.append(('hierarchical', args.group_bits, args.user_bits, 2))  # min_distance=2 for hierarchical
+    
+    if not schemes:
+        raise ValueError("No schemes to evaluate. Either provide --group-bits/--user-bits or omit --hierarchical-only")
     
     all_results = {}
     
@@ -706,9 +727,35 @@ def main():
         summary_data.append(row)
     
     summary_df = pd.DataFrame(summary_data)
+    
+    # Save local summary (in output directory)
     summary_file = os.path.join(output_dir_path, 'performance_summary.csv')
     summary_df.to_csv(summary_file, index=False)
     print(f"Summary saved to: {summary_file}")
+    
+    # If unified summary path provided, append to it
+    if args.unified_summary_path:
+        unified_path = args.unified_summary_path
+        if not os.path.isabs(unified_path):
+            unified_path = os.path.join(parent_dir, unified_path)
+        
+        # Ensure parent directory exists
+        unified_dir = os.path.dirname(unified_path)
+        if unified_dir:  # Only create if there's a directory component
+            os.makedirs(unified_dir, exist_ok=True)
+        
+        # Append to existing CSV or create new one
+        if os.path.exists(unified_path):
+            existing_df = pd.read_csv(unified_path)
+            # Combine, avoiding duplicates based on scheme name
+            combined_df = pd.concat([existing_df, summary_df], ignore_index=True)
+            # Remove duplicates if any (keep last occurrence)
+            combined_df = combined_df.drop_duplicates(subset=['scheme'], keep='last')
+        else:
+            combined_df = summary_df
+        
+        combined_df.to_csv(unified_path, index=False)
+        print(f"Unified summary updated: {unified_path}")
     
     # Print summary table
     print("\n" + "=" * 80)
