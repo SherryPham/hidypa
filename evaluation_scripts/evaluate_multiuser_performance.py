@@ -476,8 +476,20 @@ def main():
     parser.add_argument(
         '--user-id',
         type=int,
-        default=64,
-        help='User ID to use for embedding test (default: 64)'
+        default=None,
+        help='Single user ID to use for embedding test (deprecated: use --user-start/--user-end instead)'
+    )
+    parser.add_argument(
+        '--user-start',
+        type=int,
+        default=1,
+        help='First user ID to test (inclusive, default: 1)'
+    )
+    parser.add_argument(
+        '--user-end',
+        type=int,
+        default=10,
+        help='Last user ID to test (inclusive, default: 10)'
     )
     parser.add_argument(
         '--prompts-file',
@@ -548,7 +560,17 @@ def main():
         print("Mode: Hierarchical-only (naive skipped)")
     if args.group_bits is not None and args.user_bits is not None:
         print(f"Hierarchical: G={args.group_bits}, U={args.user_bits}")
-    print(f"User ID: {args.user_id}")
+    
+    # Determine which users to test
+    if args.user_id is not None:
+        # Backward compatibility: single user
+        user_ids_to_test = [args.user_id]
+        print(f"User ID: {args.user_id} (single user mode)")
+    else:
+        # New: range of users
+        user_ids_to_test = list(range(args.user_start, args.user_end + 1))
+        print(f"User range: {args.user_start} to {args.user_end} (inclusive, {len(user_ids_to_test)} users)")
+    
     print(f"Users file: {users_file_path}")
     print(f"Output directory: {output_dir_path}")
     if args.unified_summary_path:
@@ -652,57 +674,70 @@ def main():
         # 3. Generate master key
         master_key = muw.keygen()
         
-        # 4-6. Embedding, detection, and tracing metrics across prompts
+        # 4-6. Embedding, detection, and tracing metrics across users and prompts
         embedding_metrics_list = []
         detection_metrics_list = []
         tracing_metrics_list = []
         
-        for prompt_idx, prompt in enumerate(prompts_to_use):
-            # Get shared baseline time for this prompt
-            baseline_time = baseline_times.get(prompt_idx)
-            if baseline_time is None:
-                print(f"⚠ Skipping prompt #{prompt_idx}: no baseline measurement available")
+        total_operations = len(user_ids_to_test) * len(prompts_to_use)
+        print(f"\nTesting {len(user_ids_to_test)} user(s) × {len(prompts_to_use)} prompt(s) = {total_operations} total operations")
+        
+        for user_id in user_ids_to_test:
+            # Validate user_id exists
+            if user_id >= muw.N:
+                print(f"⚠ Skipping user {user_id}: exceeds max users ({muw.N})")
                 continue
             
-            watermarked_text = None
-            try:
-                embed_metrics, watermarked_text = measure_embedding(
-                    muw, master_key, args.user_id, prompt, args.max_new_tokens, 
-                    scheme_name, baseline_time=baseline_time
-                )
-                embed_metrics['prompt'] = prompt
-                embed_metrics['prompt_index'] = prompt_idx
-                embedding_metrics_list.append(embed_metrics)
-            except Exception as e:
-                print(f"✗ Embedding failed for prompt #{prompt_idx}: {e}")
-                continue
-            
-            if watermarked_text:
-                recovered_codeword = None
-                try:
-                    detect_metrics, recovered_codeword = measure_detection(muw, master_key, watermarked_text, scheme_name)
-                    detect_metrics['prompt'] = prompt
-                    detect_metrics['prompt_index'] = prompt_idx
-                    detection_metrics_list.append(detect_metrics)
-                except Exception as e:
-                    print(f"✗ Detection failed for prompt #{prompt_idx}: {e}")
+            for prompt_idx, prompt in enumerate(prompts_to_use):
+                # Get shared baseline time for this prompt
+                baseline_time = baseline_times.get(prompt_idx)
+                if baseline_time is None:
+                    print(f"⚠ Skipping prompt #{prompt_idx}: no baseline measurement available")
+                    continue
                 
+                watermarked_text = None
                 try:
-                    # Pass recovered_codeword to avoid re-running detection
-                    trace_metrics = measure_tracing(muw, master_key, watermarked_text, recovered_codeword, scheme_name)
-                    trace_metrics['prompt'] = prompt
-                    trace_metrics['prompt_index'] = prompt_idx
-                    tracing_metrics_list.append(trace_metrics)
+                    embed_metrics, watermarked_text = measure_embedding(
+                        muw, master_key, user_id, prompt, args.max_new_tokens, 
+                        scheme_name, baseline_time=baseline_time
+                    )
+                    embed_metrics['prompt'] = prompt
+                    embed_metrics['prompt_index'] = prompt_idx
+                    embed_metrics['user_id'] = user_id
+                    embedding_metrics_list.append(embed_metrics)
                 except Exception as e:
-                    print(f"✗ Tracing failed for prompt #{prompt_idx}: {e}")
+                    print(f"✗ Embedding failed for user {user_id}, prompt #{prompt_idx}: {e}")
+                    continue
+                
+                if watermarked_text:
+                    recovered_codeword = None
+                    try:
+                        detect_metrics, recovered_codeword = measure_detection(muw, master_key, watermarked_text, scheme_name)
+                        detect_metrics['prompt'] = prompt
+                        detect_metrics['prompt_index'] = prompt_idx
+                        detect_metrics['user_id'] = user_id
+                        detection_metrics_list.append(detect_metrics)
+                    except Exception as e:
+                        print(f"✗ Detection failed for user {user_id}, prompt #{prompt_idx}: {e}")
+                    
+                    try:
+                        # Pass recovered_codeword to avoid re-running detection
+                        trace_metrics = measure_tracing(muw, master_key, watermarked_text, recovered_codeword, scheme_name)
+                        trace_metrics['prompt'] = prompt
+                        trace_metrics['prompt_index'] = prompt_idx
+                        trace_metrics['user_id'] = user_id
+                        tracing_metrics_list.append(trace_metrics)
+                    except Exception as e:
+                        print(f"✗ Tracing failed for user {user_id}, prompt #{prompt_idx}: {e}")
         
         if embedding_metrics_list:
             avg_embedding = aggregate_numeric_metrics(embedding_metrics_list)
             scheme_results['embedding'] = {
                 'average': avg_embedding,
-                'per_prompt': embedding_metrics_list
+                'per_operation': embedding_metrics_list  # Changed from 'per_prompt' to 'per_operation'
             }
-            print(f"Embedding completed for {len(embedding_metrics_list)} prompt(s); average time {avg_embedding.get('embed_time_sec', 0):.4f}s")
+            num_users_tested = len(set(m.get('user_id') for m in embedding_metrics_list if 'user_id' in m))
+            print(f"Embedding completed: {len(embedding_metrics_list)} operations ({num_users_tested} user(s) × {len(embedding_metrics_list) // max(num_users_tested, 1)} prompt(s)); average time {avg_embedding.get('embed_time_sec', 0):.4f}s")
         else:
             scheme_results['embedding'] = {'error': 'No successful embeddings'}
         
@@ -710,9 +745,10 @@ def main():
             avg_detection = aggregate_numeric_metrics(detection_metrics_list)
             scheme_results['detection'] = {
                 'average': avg_detection,
-                'per_prompt': detection_metrics_list
+                'per_operation': detection_metrics_list  # Changed from 'per_prompt' to 'per_operation'
             }
-            print(f"Detection completed for {len(detection_metrics_list)} prompt(s); average time {avg_detection.get('detect_time_sec', 0):.4f}s")
+            num_users_tested = len(set(m.get('user_id') for m in detection_metrics_list if 'user_id' in m))
+            print(f"Detection completed: {len(detection_metrics_list)} operations ({num_users_tested} user(s) × {len(detection_metrics_list) // max(num_users_tested, 1)} prompt(s)); average time {avg_detection.get('detect_time_sec', 0):.4f}s")
         else:
             scheme_results['detection'] = {'error': 'No detection results available'}
         
@@ -720,9 +756,10 @@ def main():
             avg_tracing = aggregate_numeric_metrics(tracing_metrics_list)
             scheme_results['tracing'] = {
                 'average': avg_tracing,
-                'per_prompt': tracing_metrics_list
+                'per_operation': tracing_metrics_list  # Changed from 'per_prompt' to 'per_operation'
             }
-            print(f"Tracing completed for {len(tracing_metrics_list)} prompt(s); average time {avg_tracing.get('trace_time_sec', 0):.4f}s")
+            num_users_tested = len(set(m.get('user_id') for m in tracing_metrics_list if 'user_id' in m))
+            print(f"Tracing completed: {len(tracing_metrics_list)} operations ({num_users_tested} user(s) × {len(tracing_metrics_list) // max(num_users_tested, 1)} prompt(s)); average time {avg_tracing.get('trace_time_sec', 0):.4f}s")
         else:
             scheme_results['tracing'] = {'error': 'No tracing results available'}
         

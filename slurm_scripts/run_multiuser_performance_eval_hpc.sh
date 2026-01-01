@@ -58,7 +58,8 @@ run_py evaluation_scripts/evaluate_multiuser_performance.py \
     --max-new-tokens 512 \
     --prompts-file assets/prompts.txt \
     --max-prompts 300 \
-    --user-id 0 \
+    --user-start 1 \
+    --user-end 10 \
     --output-dir evaluation/multiuser_performance/naive/L8 \
     --unified-summary-path "${UNIFIED_SUMMARY}"
 
@@ -94,7 +95,8 @@ for config in "${GU_CONFIGS[@]}"; do
         --max-new-tokens 512 \
         --prompts-file assets/prompts.txt \
         --max-prompts 300 \
-        --user-id 0 \
+        --user-start 1 \
+        --user-end 10 \
         --hierarchical-only \
         --output-dir "evaluation/multiuser_performance/hierarchical/G${group_bits}_U${user_bits}" \
         --unified-summary-path "${UNIFIED_SUMMARY}"
