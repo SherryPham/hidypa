@@ -195,6 +195,12 @@ def truncate_text_to_context(text: str, tokenizer, max_tokens: int) -> str:
 def compute_z_score(lbw, master_key, text):
     """Compute overall z-score from L-bit detection."""
     tokenizer = lbw.model.tokenizer
+    max_position_embeddings = getattr(lbw.model._model.config, 'max_position_embeddings', 1024)
+    
+    # Truncate text to prevent token limit errors
+    max_tokens = max_position_embeddings - 20  # Safety margin
+    text = truncate_text_to_context(text, tokenizer, max_tokens)
+    
     token_ids = tokenizer.encode(text, return_tensors="pt").to(lbw.model.device)[0]
 
     if len(token_ids) < 2:
@@ -369,6 +375,10 @@ def evaluate_prompt_with_rewrite_attack(
     # Embed watermark with adjusted parameters
     raw_text = muw.embed(master_key, true_user_id, prompt, max_new_tokens=effective_max_new_tokens)
     final_text = parse_final_output(raw_text, model_name)
+    
+    # Truncate final_text to prevent token limit issues
+    max_text_tokens = max_position_embeddings - safety_margin
+    final_text = truncate_text_to_context(final_text, tokenizer, max_text_tokens)
     
     # Get ground truth codeword
     try:
