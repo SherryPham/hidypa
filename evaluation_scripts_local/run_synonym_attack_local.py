@@ -387,8 +387,11 @@ def collect_and_aggregate_summaries_concise(
     output_dir: str, run_tag: str | None, csv_path: str | None = None
 ) -> str:
     """
-    Collect all summary.json files and create a concise CSV with averaged metrics
-    across all variants (one row per configuration).
+    Collect all summary.json files and create a concise CSV with ratio-specific columns.
+    For each ratio (0.05, 0.10, 0.15, 0.20, etc.), creates columns like:
+    - {ratio}_full_identity_accuracy
+    - {ratio}_false_positive_rate
+    (averaged across all modes for that ratio)
     
     Args:
         output_dir: Base output directory (e.g., "evaluation/synonym_attack")
@@ -425,8 +428,9 @@ def collect_and_aggregate_summaries_concise(
     
     print(f"\nFound {len(summary_files)} summary.json files. Aggregating (concise mode)...")
     
-    # Load all summaries and group by configuration
+    # Load all summaries and group by configuration and ratio
     config_groups = {}
+    ratio_field = "synonym_ratio"  # For synonym attack
     
     for summary_path in summary_files:
         try:
@@ -460,27 +464,28 @@ def collect_and_aggregate_summaries_concise(
                         "random_seed": summary.get("random_seed", ""),
                         "generated_utc": summary.get("generated_utc", ""),
                     },
-                    "metrics_list": [],
+                    "ratio_metrics": {},  # {ratio: [list of metric dicts]}
                 }
             
-            # Collect metrics from all variants
+            # Collect metrics grouped by ratio
             metrics_by_variant = summary.get("metrics_by_variant", {})
             if metrics_by_variant:
                 for variant_key, variant_metrics in metrics_by_variant.items():
-                    # Extract only numeric metrics (exclude variant identifiers)
-                    variant_metrics_clean = {
-                        k: v for k, v in variant_metrics.items()
-                        if k not in ["synonym_ratio", "synonym_mode", "num_results"]
-                        and isinstance(v, (int, float))
-                    }
-                    if variant_metrics_clean:
-                        config_groups[config_key]["metrics_list"].append(variant_metrics_clean)
-            else:
-                # Fallback: use aggregated metrics if available
-                metrics = summary.get("metrics", {})
-                metrics_clean = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
-                if metrics_clean:
-                    config_groups[config_key]["metrics_list"].append(metrics_clean)
+                    ratio = variant_metrics.get(ratio_field)
+                    if ratio is not None:
+                        # Convert ratio to string for consistent grouping
+                        ratio_str = str(ratio)
+                        if ratio_str not in config_groups[config_key]["ratio_metrics"]:
+                            config_groups[config_key]["ratio_metrics"][ratio_str] = []
+                        
+                        # Extract all numeric metrics (exclude variant identifiers)
+                        variant_metrics_clean = {
+                            k: v for k, v in variant_metrics.items()
+                            if k not in ["synonym_ratio", "synonym_mode", "num_results"]
+                            and isinstance(v, (int, float))
+                        }
+                        if variant_metrics_clean:
+                            config_groups[config_key]["ratio_metrics"][ratio_str].append(variant_metrics_clean)
         except Exception as e:
             print(f"  Warning: Failed to load {summary_path}: {e}")
             continue
@@ -489,32 +494,37 @@ def collect_and_aggregate_summaries_concise(
         print("  Warning: No valid summaries could be loaded.")
         return csv_path
     
-    # Average metrics for each configuration
+    # Create rows with ratio-specific columns
     rows = []
     for config_key, group_data in sorted(config_groups.items()):
         row = group_data["base_info"].copy()
         
-        metrics_list = group_data["metrics_list"]
-        if not metrics_list:
+        ratio_metrics = group_data["ratio_metrics"]
+        if not ratio_metrics:
             continue
         
-        # Get all metric names
-        all_metric_names = set()
-        for metrics_dict in metrics_list:
-            all_metric_names.update(metrics_dict.keys())
+        # Get all unique ratios and sort them
+        ratios = sorted(ratio_metrics.keys(), key=lambda x: float(x))
         
-        # Average each metric across all variants
-        for metric_name in sorted(all_metric_names):
-            values = [m.get(metric_name) for m in metrics_list if metric_name in m]
-            if values:
-                # Filter out None/NaN values
-                numeric_values = [v for v in values if v is not None and not (isinstance(v, float) and pd.isna(v))]
-                if numeric_values:
-                    row[metric_name] = sum(numeric_values) / len(numeric_values)
-                else:
-                    row[metric_name] = None
-            else:
-                row[metric_name] = None
+        # Only include these two metrics for each ratio
+        target_metrics = ["full_identity_accuracy", "false_positive_rate"]
+        
+        # For each ratio, average metrics across all modes and create columns
+        for ratio in ratios:
+            metrics_list = ratio_metrics[ratio]
+            if not metrics_list:
+                continue
+            
+            # Average only the target metrics for this ratio
+            for metric_name in target_metrics:
+                values = [m.get(metric_name) for m in metrics_list if metric_name in m]
+                if values:
+                    # Filter out None/NaN values
+                    numeric_values = [v for v in values if v is not None and not (isinstance(v, float) and pd.isna(v))]
+                    if numeric_values:
+                        # Create column name: {ratio}_{metric_name}
+                        column_name = f"{ratio}_{metric_name}"
+                        row[column_name] = sum(numeric_values) / len(numeric_values)
         
         rows.append(row)
     
