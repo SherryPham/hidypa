@@ -725,6 +725,15 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
                     f"only supports maximum {max_codewords} groups"
                 )
             
+            # Handle edge case: when L=1, we can only have 1 group with codeword "0"
+            if L == 1:
+                if num_groups > 1:
+                    raise ValueError(
+                        f"Requested {num_groups} groups but min_distance=2 with 1 bit "
+                        f"only supports 1 group"
+                    )
+                return {0: "0"}
+            
             codewords = {}
             count = 0
             
