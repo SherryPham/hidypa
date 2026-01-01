@@ -700,6 +700,76 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
         self.user_to_group: dict[int, int] = {}  # user_id -> group_id
         self.group_to_users: dict[int, list[int]] = {}  # group_id -> list of user_ids
     
+    def _generate_group_codewords_direct(self, num_groups: int) -> dict[int, str]:
+        """
+        Generate group codewords directly without temp file (optimized).
+        For min_distance=2, generates even-parity codewords efficiently.
+        
+        Args:
+            num_groups: Number of group codewords to generate
+            
+        Returns:
+            dict mapping group_id (0 to num_groups-1) to codeword string
+        """
+        if self.min_distance == 2:
+            # Optimized even-parity codeword generation (50% fewer iterations)
+            # Instead of iterating 0 to 2^L and checking parity, we iterate 0 to 2^(L-1)
+            # and append a parity bit to make total parity even. This generates the same
+            # codewords in the same order as the original method.
+            L = self.group_bits
+            max_codewords = 2 ** (L - 1)
+            
+            if num_groups > max_codewords:
+                raise ValueError(
+                    f"Requested {num_groups} groups but min_distance=2 with {L} bits "
+                    f"only supports maximum {max_codewords} groups"
+                )
+            
+            codewords = {}
+            count = 0
+            
+            # Pre-compute format templates (optimization #3)
+            format_template = f'0{L}b'
+            format_base_template = f'0{L-1}b'
+            
+            # Optimized even-parity generation: iterate only 2^(L-1) instead of 2^L (50% faster)
+            # For each base number, append a parity bit to make total parity even
+            # This generates the same codewords in the same order as the original method
+            try:
+                # Python 3.10+ has efficient bit_count()
+                for base in range(2 ** (L - 1)):
+                    base_parity = base.bit_count() % 2
+                    # Append bit to make total parity even: if base is even parity, append 0; if odd, append 1
+                    parity_bit = '0' if base_parity == 0 else '1'
+                    codeword_str = format(base, format_base_template) + parity_bit
+                    codewords[count] = codeword_str
+                    count += 1
+                    if count == num_groups:
+                        break
+            except AttributeError:
+                # Fallback for Python < 3.10: use bin().count('1')
+                for base in range(2 ** (L - 1)):
+                    base_parity = bin(base).count('1') % 2
+                    # Append bit to make total parity even: if base is even parity, append 0; if odd, append 1
+                    parity_bit = '0' if base_parity == 0 else '1'
+                    codeword_str = format(base, format_base_template) + parity_bit
+                    codewords[count] = codeword_str
+                    count += 1
+                    if count == num_groups:
+                        break
+            
+            print(f"Generated {len(codewords)} group codewords directly "
+                  f"(min_distance=2, {L} bits, max {max_codewords} possible)")
+            
+            return codewords
+        else:
+            # For min_distance > 2, we still need to use FingerprintingCode
+            # This is less common, so we'll keep the original approach for now
+            raise NotImplementedError(
+                f"Direct codeword generation not yet implemented for min_distance={self.min_distance}. "
+                "Please use min_distance=2 for optimized performance."
+            )
+    
     def load_users(self, users_file: str) -> pd.DataFrame:
         """
         Loads user metadata and generates hierarchical codeword structure.
@@ -839,46 +909,51 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
                 f"group_bits={self.group_bits} and min_distance={self.min_distance} (max {max_possible_groups})"
             )
         
-        # Generate group codewords using FingerprintingCode
-        # We need to create a temporary users file for the group fingerprinter
-        # that has one "user" per group, and configure it to use 1 user per group
-        # so we get exactly num_groups groups
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as tmp_file:
-            tmp_file.write("UserId,Username\n")
-            for gid in range(num_groups):
-                tmp_file.write(f"{gid},{gid}\n")
-            tmp_file_path = tmp_file.name
-        
-        try:
-            # Temporarily set users_per_group to 1 to ensure each "user" gets its own group
-            original_users_per_group = self.group_fingerprinter.users_per_group
-            original_max_groups = self.group_fingerprinter.max_groups
-            self.group_fingerprinter.users_per_group = 1
-            self.group_fingerprinter.max_groups = num_groups
-            self.group_fingerprinter.gen(users_file=tmp_file_path)
-            # Restore original values
-            self.group_fingerprinter.users_per_group = original_users_per_group
-            self.group_fingerprinter.max_groups = original_max_groups
-        finally:
-            os.unlink(tmp_file_path)
-        
-        # Extract group codewords
-        for group_id in range(num_groups):
-            group_codeword_array = self.group_fingerprinter.codewords[group_id]
-            self.group_codewords[group_id] = "".join(map(str, group_codeword_array))
+        # Generate group codewords directly (optimized - no temp file needed)
+        # For min_distance=2, use optimized even-parity generation
+        # For other min_distance values, fall back to FingerprintingCode
+        if self.min_distance == 2:
+            # Optimized path: generate codewords directly
+            self.group_codewords = self._generate_group_codewords_direct(num_groups)
+        else:
+            # Fallback: use FingerprintingCode for min_distance > 2
+            # This is less common, so we keep the original approach
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as tmp_file:
+                tmp_file.write("UserId,Username\n")
+                for gid in range(num_groups):
+                    tmp_file.write(f"{gid},{gid}\n")
+                tmp_file_path = tmp_file.name
+            
+            try:
+                # Temporarily set users_per_group to 1 to ensure each "user" gets its own group
+                original_users_per_group = self.group_fingerprinter.users_per_group
+                original_max_groups = self.group_fingerprinter.max_groups
+                self.group_fingerprinter.users_per_group = 1
+                self.group_fingerprinter.max_groups = num_groups
+                self.group_fingerprinter.gen(users_file=tmp_file_path)
+                # Restore original values
+                self.group_fingerprinter.users_per_group = original_users_per_group
+                self.group_fingerprinter.max_groups = original_max_groups
+            finally:
+                os.unlink(tmp_file_path)
+            
+            # Extract group codewords
+            for group_id in range(num_groups):
+                group_codeword_array = self.group_fingerprinter.codewords[group_id]
+                self.group_codewords[group_id] = "".join(map(str, group_codeword_array))
         
         # Assign users to groups and build mappings
+        # Pre-allocate lists for all groups (optimization #1: avoids repeated dict lookups)
         self.user_to_group = {}
-        self.group_to_users = {}
+        self.group_to_users = {gid: [] for gid in range(num_groups)}
+        
         for index, row in self.user_metadata.iterrows():
             user_id = int(row["UserId"])
             # Use index instead of user_id to ensure groups are 0, 1, 2, ..., num_groups-1
             # This matches the group codewords that were generated for groups 0 to num_groups-1
             group_id = index // users_per_group
             self.user_to_group[user_id] = group_id
-            if group_id not in self.group_to_users:
-                self.group_to_users[group_id] = []
             self.group_to_users[group_id].append(user_id)
         
         print(f"Loaded {self.N} users into {num_groups} groups ({users_per_group} users per group)")

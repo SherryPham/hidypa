@@ -150,16 +150,22 @@ def measure_initialization(muw, users_file: str, scheme_name: str) -> dict:
     }
 
 
-def measure_embedding(muw, master_key: bytes, user_id: int, prompt: str, max_new_tokens: int, scheme_name: str) -> Tuple[dict, str]:
-    """Measure embedding time, memory, and overhead. Returns metrics dict and watermarked text."""
-    print(f"\n--- Measuring Embedding for {scheme_name} ---")
+def measure_baseline(model_wrapper, tokenizer, prompt: str, max_new_tokens: int) -> Tuple[float, int]:
+    """
+    Measure baseline generation time (no watermarking) for a prompt.
     
-    # Get baseline (no watermarking) - just model generation
-    model = muw.lbw.model
-    tokenizer = model.tokenizer
-    device = model.device
+    Args:
+        model_wrapper: The model wrapper (e.g., GPT2Model instance) with ._model and .device
+        tokenizer: The tokenizer to use
+        prompt: Input prompt
+        max_new_tokens: Maximum tokens to generate
     
-    # Baseline generation time
+    Returns:
+        (baseline_time_sec, baseline_tokens)
+    """
+    device = model_wrapper.device
+    
+    # Prepare input
     if tokenizer.chat_template:
         messages = [{"role": "user", "content": prompt}]
         input_ids = tokenizer.apply_chat_template(
@@ -170,11 +176,10 @@ def measure_embedding(muw, master_key: bytes, user_id: int, prompt: str, max_new
     
     attention_mask = torch.ones_like(input_ids)
     
-    # Baseline time
-    memory_before = get_memory_mb()
+    # Measure baseline generation time
     start_time = time.perf_counter()
     with torch.no_grad():
-        baseline_output = model._model.generate(
+        baseline_output = model_wrapper._model.generate(
             input_ids,
             max_new_tokens=max_new_tokens,
             do_sample=True, top_k=50, top_p=0.95, temperature=0.7,
@@ -182,7 +187,36 @@ def measure_embedding(muw, master_key: bytes, user_id: int, prompt: str, max_new
             attention_mask=attention_mask
         )
     baseline_time = time.perf_counter() - start_time
-    memory_after_baseline = get_memory_mb()
+    
+    # Count tokens
+    baseline_tokens = len(baseline_output[0]) - len(input_ids[0])
+    
+    return baseline_time, baseline_tokens
+
+
+def measure_embedding(muw, master_key: bytes, user_id: int, prompt: str, max_new_tokens: int, 
+                     scheme_name: str, baseline_time: float = None) -> Tuple[dict, str]:
+    """
+    Measure embedding time, memory, and overhead. Returns metrics dict and watermarked text.
+    
+    Args:
+        muw: Multi-user watermarker instance
+        master_key: Master key for watermarking
+        user_id: User ID to embed
+        prompt: Input prompt
+        max_new_tokens: Maximum tokens to generate
+        scheme_name: Name of the scheme (for logging)
+        baseline_time: Pre-measured baseline time (if None, will measure it)
+    """
+    print(f"\n--- Measuring Embedding for {scheme_name} ---")
+    
+    # Get model and tokenizer
+    model = muw.lbw.model
+    tokenizer = model.tokenizer
+    
+    # Measure baseline if not provided
+    if baseline_time is None:
+        baseline_time, _ = measure_baseline(model, tokenizer, prompt, max_new_tokens)
     
     # Watermarked generation time
     memory_before_watermark = get_memory_mb()
@@ -192,14 +226,23 @@ def measure_embedding(muw, master_key: bytes, user_id: int, prompt: str, max_new
     memory_after_watermark = get_memory_mb()
     
     # Count tokens
-    baseline_tokens = len(baseline_output[0]) - len(input_ids[0])
     watermarked_tokens = len(tokenizer.encode(watermarked_text))
+    
+    # Calculate overhead metrics
+    overhead_time = embed_time - baseline_time
+    
+    # New overhead calculation: overhead as % of total embedding time (more intuitive)
+    overhead_percent = (overhead_time / embed_time * 100) if embed_time > 0 else 0
+    
+    # Also calculate overhead per token
+    overhead_per_token_ms = (overhead_time / watermarked_tokens * 1000) if watermarked_tokens > 0 else 0
     
     metrics = {
         'embed_time_sec': embed_time,
         'baseline_time_sec': baseline_time,
-        'overhead_time_sec': embed_time - baseline_time,
-        'overhead_percent': ((embed_time - baseline_time) / baseline_time * 100) if baseline_time > 0 else 0,
+        'overhead_time_sec': overhead_time,
+        'overhead_percent': overhead_percent,  # Now: overhead as % of total embedding time
+        'overhead_per_token_ms': overhead_per_token_ms,  # New: overhead per token
         'time_per_token_ms': (embed_time / watermarked_tokens * 1000) if watermarked_tokens > 0 else 0,
         'memory_before_mb': memory_before_watermark,
         'memory_after_mb': memory_after_watermark,
@@ -553,6 +596,22 @@ def main():
     if not schemes:
         raise ValueError("No schemes to evaluate. Either provide --group-bits/--user-bits or omit --hierarchical-only")
     
+    # Pre-measure baselines for all prompts (shared across all schemes)
+    print(f"\n{'=' * 80}")
+    print("Measuring baselines for all prompts (shared across schemes)")
+    print(f"{'=' * 80}")
+    model_wrapper = lbw.model
+    tokenizer = model_wrapper.tokenizer
+    baseline_times = {}
+    for prompt_idx, prompt in enumerate(prompts_to_use):
+        try:
+            baseline_time, _ = measure_baseline(model_wrapper, tokenizer, prompt, args.max_new_tokens)
+            baseline_times[prompt_idx] = baseline_time
+            print(f"Prompt {prompt_idx}: baseline = {baseline_time:.4f}s")
+        except Exception as e:
+            print(f"✗ Baseline measurement failed for prompt #{prompt_idx}: {e}")
+            baseline_times[prompt_idx] = None
+    
     all_results = {}
     
     for scheme_name, group_bits, user_bits, min_distance in schemes:
@@ -599,10 +658,17 @@ def main():
         tracing_metrics_list = []
         
         for prompt_idx, prompt in enumerate(prompts_to_use):
+            # Get shared baseline time for this prompt
+            baseline_time = baseline_times.get(prompt_idx)
+            if baseline_time is None:
+                print(f"⚠ Skipping prompt #{prompt_idx}: no baseline measurement available")
+                continue
+            
             watermarked_text = None
             try:
                 embed_metrics, watermarked_text = measure_embedding(
-                    muw, master_key, args.user_id, prompt, args.max_new_tokens, scheme_name
+                    muw, master_key, args.user_id, prompt, args.max_new_tokens, 
+                    scheme_name, baseline_time=baseline_time
                 )
                 embed_metrics['prompt'] = prompt
                 embed_metrics['prompt_index'] = prompt_idx
@@ -698,6 +764,7 @@ def main():
             embed_avg = results['embedding'].get('average', {})
             row['embed_time_sec'] = embed_avg.get('embed_time_sec', 0)
             row['embed_overhead_percent'] = embed_avg.get('overhead_percent', 0)
+            row['overhead_per_token_ms'] = embed_avg.get('overhead_per_token_ms', 0)
             row['time_per_token_ms'] = embed_avg.get('time_per_token_ms', 0)
         
         # Detection
