@@ -8,7 +8,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --time=4:00:00
+#SBATCH --time=64:00:00
 #SBATCH --output=slurm_out/slurm-%j.out
 module --force purge
 module load apptainer
