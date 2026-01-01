@@ -174,21 +174,30 @@ def json_default_encoder(obj):
 
 def truncate_text_to_context(text: str, tokenizer, max_tokens: int) -> str:
     """
-    Truncate text to fit within max_tokens.
+    Truncate text to fit within max_tokens, accounting for special tokens.
     
     Args:
         text: Text to truncate
         tokenizer: Tokenizer to use for encoding/decoding
-        max_tokens: Maximum number of tokens allowed
+        max_tokens: Maximum number of tokens allowed (including special tokens)
     
     Returns:
-        Truncated text that fits within max_tokens
+        Truncated text that fits within max_tokens when encoded with special tokens
     """
+    # Check how many special tokens are added when encoding
+    dummy_text = "test"
+    dummy_with_special = tokenizer.encode(dummy_text, add_special_tokens=True)
+    dummy_without_special = tokenizer.encode(dummy_text, add_special_tokens=False)
+    num_special_tokens = len(dummy_with_special) - len(dummy_without_special)
+    
+    # Account for special tokens: we can only use (max_tokens - num_special_tokens) for actual text
+    max_text_tokens = max(1, max_tokens - num_special_tokens)
+    
     token_ids = tokenizer.encode(text, add_special_tokens=False)
-    if len(token_ids) <= max_tokens:
+    if len(token_ids) <= max_text_tokens:
         return text
     # Deterministically truncate from the end
-    truncated_ids = token_ids[:max_tokens]
+    truncated_ids = token_ids[:max_text_tokens]
     return tokenizer.decode(truncated_ids, skip_special_tokens=True)
 
 
