@@ -191,6 +191,16 @@ def build_common_parser() -> argparse.ArgumentParser:
         help="Path for the aggregated CSV summary (default: <output-dir>/summary_all_configs.csv).",
     )
     parser.add_argument(
+        "--generate-csv-summary-concise",
+        action="store_true",
+        help="Generate a concise CSV with averaged metrics across all variants (one row per configuration).",
+    )
+    parser.add_argument(
+        "--csv-summary-concise-path",
+        default=None,
+        help="Path for the concise CSV summary (default: <output-dir>/summary_all_configs_concise.csv).",
+    )
+    parser.add_argument(
         "--csv-only",
         action="store_true",
         help="Skip running evaluations and only generate CSV from existing summary.json files.",
@@ -373,6 +383,167 @@ def collect_and_aggregate_summaries(
     return csv_path
 
 
+def collect_and_aggregate_summaries_concise(
+    output_dir: str, run_tag: str | None, csv_path: str | None = None
+) -> str:
+    """
+    Collect all summary.json files and create a concise CSV with averaged metrics
+    across all variants (one row per configuration).
+    
+    Args:
+        output_dir: Base output directory (e.g., "evaluation/paraphrasing_attack")
+        run_tag: Optional run tag to filter summaries (None = include all)
+        csv_path: Optional custom path for CSV output
+    
+    Returns:
+        Path to the generated CSV file
+    """
+    output_dir_abs = os.path.join(REPO_ROOT, output_dir)
+    
+    if csv_path is None:
+        csv_path = os.path.join(output_dir_abs, "summary_all_configs_concise.csv")
+    else:
+        csv_path = os.path.join(REPO_ROOT, csv_path) if not os.path.isabs(csv_path) else csv_path
+    
+    # Find all summary.json files
+    summary_files = []
+    for root, dirs, files in os.walk(output_dir_abs):
+        if "summary.json" in files:
+            summary_path = os.path.join(root, "summary.json")
+            # Only include summaries from this run_tag if specified
+            if run_tag and run_tag in summary_path:
+                summary_files.append(summary_path)
+            elif not run_tag:
+                # If no run_tag filter, include all summaries
+                summary_files.append(summary_path)
+    
+    if not summary_files:
+        print(f"Warning: No summary.json files found in {output_dir_abs}")
+        if run_tag:
+            print(f"  (filtered by run_tag: {run_tag})")
+        return csv_path
+    
+    print(f"\nFound {len(summary_files)} summary.json files. Aggregating (concise mode)...")
+    
+    # Load all summaries and group by configuration
+    config_groups = {}
+    
+    for summary_path in summary_files:
+        try:
+            with open(summary_path, "r", encoding="utf-8") as f:
+                summary = json.load(f)
+            
+            # Create configuration key (excluding variant-specific fields)
+            config_key = (
+                summary.get("scheme", ""),
+                summary.get("model", ""),
+                summary.get("run_tag", ""),
+                summary.get("l_bits", ""),
+                summary.get("group_bits", ""),
+                summary.get("user_bits", ""),
+                summary.get("num_prompts", ""),
+                summary.get("random_seed", ""),
+            )
+            
+            if config_key not in config_groups:
+                config_groups[config_key] = {
+                    "base_info": {
+                        "scheme": summary.get("scheme", ""),
+                        "model": summary.get("model", ""),
+                        "run_tag": summary.get("run_tag", ""),
+                        "l_bits": summary.get("l_bits", ""),
+                        "group_bits": summary.get("group_bits", ""),
+                        "user_bits": summary.get("user_bits", ""),
+                        "num_prompts": summary.get("num_prompts", ""),
+                        "num_attack_variants_per_prompt": summary.get("num_attack_variants_per_prompt", ""),
+                        "total_attack_results": summary.get("total_attack_results", ""),
+                        "random_seed": summary.get("random_seed", ""),
+                        "generated_utc": summary.get("generated_utc", ""),
+                    },
+                    "metrics_list": [],
+                }
+            
+            # Collect metrics from all variants
+            metrics_by_variant = summary.get("metrics_by_variant", {})
+            if metrics_by_variant:
+                for variant_key, variant_metrics in metrics_by_variant.items():
+                    # Extract only numeric metrics (exclude variant identifiers)
+                    variant_metrics_clean = {
+                        k: v for k, v in variant_metrics.items()
+                        if k not in ["paraphrase_ratio", "paraphrase_mode", "num_results"]
+                        and isinstance(v, (int, float))
+                    }
+                    if variant_metrics_clean:
+                        config_groups[config_key]["metrics_list"].append(variant_metrics_clean)
+            else:
+                # Fallback: use aggregated metrics if available
+                metrics = summary.get("metrics", {})
+                metrics_clean = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
+                if metrics_clean:
+                    config_groups[config_key]["metrics_list"].append(metrics_clean)
+        except Exception as e:
+            print(f"  Warning: Failed to load {summary_path}: {e}")
+            continue
+    
+    if not config_groups:
+        print("  Warning: No valid summaries could be loaded.")
+        return csv_path
+    
+    # Average metrics for each configuration
+    rows = []
+    for config_key, group_data in sorted(config_groups.items()):
+        row = group_data["base_info"].copy()
+        
+        metrics_list = group_data["metrics_list"]
+        if not metrics_list:
+            continue
+        
+        # Get all metric names
+        all_metric_names = set()
+        for metrics_dict in metrics_list:
+            all_metric_names.update(metrics_dict.keys())
+        
+        # Average each metric across all variants
+        for metric_name in sorted(all_metric_names):
+            values = [m.get(metric_name) for m in metrics_list if metric_name in m]
+            if values:
+                # Filter out None/NaN values
+                numeric_values = [v for v in values if v is not None and not (isinstance(v, float) and pd.isna(v))]
+                if numeric_values:
+                    row[metric_name] = sum(numeric_values) / len(numeric_values)
+                else:
+                    row[metric_name] = None
+            else:
+                row[metric_name] = None
+        
+        rows.append(row)
+    
+    if not rows:
+        print("  Warning: No valid rows could be created.")
+        return csv_path
+    
+    # Create DataFrame and save
+    df = pd.DataFrame(rows)
+    
+    # Sort by scheme, then group_bits, then user_bits
+    sort_columns = ["scheme"]
+    if "group_bits" in df.columns:
+        sort_columns.append("group_bits")
+    if "user_bits" in df.columns:
+        sort_columns.append("user_bits")
+    
+    if len(sort_columns) > 1:
+        df = df.sort_values(by=sort_columns, na_position="last")
+    
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+    df.to_csv(csv_path, index=False)
+    
+    print(f"  Concise CSV saved to: {csv_path}")
+    print(f"  Contains {len(df)} configurations with {len(df.columns)} columns")
+    
+    return csv_path
+
+
 def main():
     parser = build_common_parser()
     args = parser.parse_args()
@@ -386,10 +557,16 @@ def main():
         # Use run_tag_filter if provided, otherwise use run_tag, otherwise None (include all)
         filter_tag = args.run_tag_filter if args.run_tag_filter is not None else args.run_tag
         
-        csv_path = collect_and_aggregate_summaries(
-            args.output_dir, filter_tag, args.csv_summary_path
-        )
-        print(f"\nCSV summary: {csv_path}")
+        if args.generate_csv_summary_concise:
+            csv_path = collect_and_aggregate_summaries_concise(
+                args.output_dir, filter_tag, args.csv_summary_concise_path
+            )
+            print(f"\nConcise CSV summary: {csv_path}")
+        else:
+            csv_path = collect_and_aggregate_summaries(
+                args.output_dir, filter_tag, args.csv_summary_path
+            )
+            print(f"\nCSV summary: {csv_path}")
         return
 
     # Normal mode: run evaluations
@@ -432,6 +609,13 @@ def main():
             args.output_dir, run_tag, args.csv_summary_path
         )
         print(f"\nCSV summary: {csv_path}")
+    
+    # Generate concise CSV summary if requested
+    if args.generate_csv_summary_concise and not args.dry_run:
+        csv_path = collect_and_aggregate_summaries_concise(
+            args.output_dir, run_tag, args.csv_summary_concise_path
+        )
+        print(f"\nConcise CSV summary: {csv_path}")
 
 
 if __name__ == "__main__":
