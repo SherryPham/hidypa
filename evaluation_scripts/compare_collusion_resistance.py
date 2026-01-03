@@ -269,6 +269,7 @@ def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_
     """
     Try to trace back to original colluding users using the merged codeword.
     Uses direct codeword matching with Hamming distance.
+    Checks ALL users to properly detect false positives (innocent users incorrectly accused).
     
     Args:
         muw: Multi-user watermarker instance
@@ -284,7 +285,11 @@ def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_
         matches = []
         hamming_distances = {}
         
-        for user_id in original_user_ids:
+        # Check ALL users (0 to N-1), not just original colluders
+        # This allows us to detect false positives (innocent users incorrectly accused)
+        all_user_ids = list(range(muw.N))
+        
+        for user_id in all_user_ids:
             try:
                 user_codeword = muw.get_codeword_for_user(user_id)
                 # Calculate Hamming distance, but only on positions where merged codeword has valid bits
@@ -316,7 +321,7 @@ def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_
         
         return {
             'success': len(matches) > 0,
-            'accused_user_ids': matches,
+            'accused_user_ids': matches,  # May include non-colluders (false positives)
             'original_user_ids': original_user_ids,
             'matches': matches,
             'num_matches': len(matches),
