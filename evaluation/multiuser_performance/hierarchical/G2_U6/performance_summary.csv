@@ -1,0 +1,2 @@
+scheme,init_time_sec,init_memory_mb,storage_mb,num_groups,users_per_group,embed_time_sec,embed_overhead_percent,overhead_per_token_ms,time_per_token_ms,detect_time_sec,hmac_operations,trace_time_sec,trace_comparisons,max_users,max_groups,max_users_per_group,group_bits,user_bits
+hierarchical_G2_U6,0.101189651992172,1.6484375,0.0001468658447265625,2,64.0,4.728140173360705,-21.779806940221533,-1.8687408722068886,9.859150224129897,1.7682488433892334,16.0,0.00035008295186950513,128.0,256,4,64,2,6
