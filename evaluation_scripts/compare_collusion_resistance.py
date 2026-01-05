@@ -268,7 +268,9 @@ def save_raw_results(records: list[dict], output_path: str):
 def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_ids: list[int]) -> dict:
     """
     Try to trace back to original colluding users using the merged codeword.
-    Uses direct codeword matching with Hamming distance.
+    For hierarchical schemes, uses the built-in trace_from_codeword method which
+    first identifies suspect groups, then searches only within those groups.
+    For naive schemes, uses direct codeword matching with Hamming distance.
     Checks ALL users to properly detect false positives (innocent users incorrectly accused).
     
     Args:
@@ -281,7 +283,48 @@ def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_
         Dictionary with tracing results including success status
     """
     try:
-        # Direct codeword matching: compare merged codeword with each user's codeword
+        # For hierarchical schemes, use the built-in trace_from_codeword method
+        # This is more efficient and accurate as it first identifies suspect groups
+        if hasattr(muw, 'trace_from_codeword') and hasattr(muw, 'group_codewords') and muw.group_codewords:
+            try:
+                # Use hierarchical tracing: identifies suspect groups first, then searches within them
+                accused_users = muw.trace_from_codeword(merged_codeword)
+                matches = [u['user_id'] for u in accused_users]
+                
+                # Calculate Hamming distances for all users for completeness
+                hamming_distances = {}
+                all_user_ids = list(range(muw.N))
+                valid_positions = [i for i, c in enumerate(merged_codeword) if c in ('0', '1')]
+                
+                for user_id in all_user_ids:
+                    try:
+                        user_codeword = muw.get_codeword_for_user(user_id)
+                        if valid_positions:
+                            hamming_dist = sum(
+                                merged_codeword[i] != user_codeword[i] 
+                                for i in valid_positions
+                            )
+                        else:
+                            hamming_dist = float('inf')
+                        hamming_distances[user_id] = hamming_dist
+                    except Exception:
+                        hamming_distances[user_id] = float('inf')
+                
+                return {
+                    'success': len(matches) > 0,
+                    'accused_user_ids': matches,  # May include non-colluders (false positives)
+                    'original_user_ids': original_user_ids,
+                    'matches': matches,
+                    'num_matches': len(matches),
+                    'merged_codeword': merged_codeword,
+                    'hamming_distances': hamming_distances,
+                    'method': 'hierarchical_trace'
+                }
+            except Exception as e:
+                # If hierarchical tracing fails, fall back to direct matching
+                pass
+        
+        # For naive schemes (or if hierarchical tracing fails), use direct codeword matching
         matches = []
         hamming_distances = {}
         
@@ -289,15 +332,22 @@ def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_
         # This allows us to detect false positives (innocent users incorrectly accused)
         all_user_ids = list(range(muw.N))
         
+        # Calculate valid positions once (same for all users)
+        valid_positions = [
+            i for i, c in enumerate(merged_codeword) 
+            if c in ('0', '1')
+        ]
+        
+        # Adaptive threshold: 25% of valid bits (rounded up to nearest integer)
+        # This adapts to data quality - fewer valid bits means stricter threshold
+        if valid_positions:
+            adaptive_threshold = max(1, int(len(valid_positions) * 0.25 + 0.5))  # Round to nearest, minimum 1
+        else:
+            adaptive_threshold = float('inf')
+        
         for user_id in all_user_ids:
             try:
                 user_codeword = muw.get_codeword_for_user(user_id)
-                # Calculate Hamming distance, but only on positions where merged codeword has valid bits
-                # Skip positions with '⊥' (uncertain) or '*' (conflict)
-                valid_positions = [
-                    i for i, c in enumerate(merged_codeword) 
-                    if c in ('0', '1')
-                ]
                 
                 if not valid_positions:
                     # All positions are uncertain, can't match
@@ -311,9 +361,9 @@ def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_
                 
                 hamming_distances[user_id] = hamming_dist
                 
-                # Allow small errors (threshold of 2 bits)
+                # Use adaptive threshold: allow errors up to 25% of valid bits
                 # Also need to check that we have enough valid positions to make a meaningful comparison
-                if len(valid_positions) >= 3 and hamming_dist <= 2:
+                if len(valid_positions) >= 3 and hamming_dist <= adaptive_threshold:
                     matches.append(user_id)
             except Exception as e:
                 # If we can't get codeword for a user, skip it
@@ -834,7 +884,10 @@ def main():
             total = len(case_results)
             
             # Calculate false positives: accused users who weren't original colluders
+            # Count total false positive users (for reference)
             false_positives = 0
+            # Count prompts with at least one false positive (for false positive rate)
+            prompts_with_false_positives = 0
             for r in case_results:
                 trace_result = r.get('trace_result', {})
                 accused_user_ids = set(trace_result.get('accused_user_ids', []))
@@ -844,13 +897,14 @@ def main():
                 false_positive_users = accused_user_ids - original_user_ids
                 if false_positive_users:
                     false_positives += len(false_positive_users)
+                    prompts_with_false_positives += 1
             
             success_rates_2[case_type] = {
                 'successful': successful,
                 'total': total,
                 'success_rate': (successful / total) * 100.0 if total > 0 else 0.0,
                 'false_positives': false_positives,
-                'false_positive_rate': (false_positives / total) * 100.0 if total > 0 else 0.0
+                'false_positive_rate': (prompts_with_false_positives / total) * 100.0 if total > 0 else 0.0
             }
     
     # Calculate success rates and false positives for 3-colluder cases
@@ -870,7 +924,10 @@ def main():
             total = len(case_results)
             
             # Calculate false positives: accused users who weren't original colluders
+            # Count total false positive users (for reference)
             false_positives = 0
+            # Count prompts with at least one false positive (for false positive rate)
+            prompts_with_false_positives = 0
             for r in case_results:
                 trace_result = r.get('trace_result', {})
                 accused_user_ids = set(trace_result.get('accused_user_ids', []))
@@ -880,13 +937,14 @@ def main():
                 false_positive_users = accused_user_ids - original_user_ids
                 if false_positive_users:
                     false_positives += len(false_positive_users)
+                    prompts_with_false_positives += 1
             
             success_rates_3[case_type] = {
                 'successful': successful,
                 'total': total,
                 'success_rate': (successful / total) * 100.0 if total > 0 else 0.0,
                 'false_positives': false_positives,
-                'false_positive_rate': (false_positives / total) * 100.0 if total > 0 else 0.0
+                'false_positive_rate': (prompts_with_false_positives / total) * 100.0 if total > 0 else 0.0
             }
     
     # Save summary JSON for 2 colluders

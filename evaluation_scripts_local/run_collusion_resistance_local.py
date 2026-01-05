@@ -430,57 +430,80 @@ def collect_and_aggregate_summaries(
     ]
     
     # Calculate false positive rates from summary data
-    overall_false_positives = []
-    false_positives_2 = []
-    false_positives_3 = []
+    # Note: false_positive_rate is now "percentage of prompts with at least one false positive"
+    # We calculate weighted averages based on the number of prompts in each case type
+    overall_fp_rates = []
+    fp_rates_2 = []
+    fp_rates_3 = []
     
     for idx, row in df.iterrows():
-        # Calculate false positives for 2-colluder cases
-        fp_2 = 0
+        # Calculate weighted false positive rate for 2-colluder cases
+        fp_rate_2 = 0.0
+        total_prompts_2 = 0
         for case_type in case_types_2:
-            fp_col = f"{case_type}_false_positives"
-            if fp_col in df.columns:
-                fp_val = row.get(fp_col)
-                if pd.notna(fp_val) and fp_val != "":
+            fp_rate_col = f"{case_type}_false_positive_rate"
+            total_col = f"{case_type}_total"
+            if fp_rate_col in df.columns and total_col in df.columns:
+                fp_rate_val = row.get(fp_rate_col)
+                total_val = row.get(total_col)
+                if pd.notna(fp_rate_val) and pd.notna(total_val) and fp_rate_val != "" and total_val != "":
                     try:
-                        fp_2 += float(fp_val)
+                        fp_rate_val = float(fp_rate_val)
+                        total_val = float(total_val)
+                        # Weight by number of prompts
+                        fp_rate_2 += fp_rate_val * total_val
+                        total_prompts_2 += total_val
                     except (ValueError, TypeError):
                         pass
         
-        # Calculate false positives for 3-colluder cases
-        fp_3 = 0
+        # Calculate weighted false positive rate for 3-colluder cases
+        fp_rate_3 = 0.0
+        total_prompts_3 = 0
         for case_type in case_types_3:
-            fp_col = f"{case_type}_false_positives"
-            if fp_col in df.columns:
-                fp_val = row.get(fp_col)
-                if pd.notna(fp_val) and fp_val != "":
+            fp_rate_col = f"{case_type}_false_positive_rate"
+            total_col = f"{case_type}_total"
+            if fp_rate_col in df.columns and total_col in df.columns:
+                fp_rate_val = row.get(fp_rate_col)
+                total_val = row.get(total_col)
+                if pd.notna(fp_rate_val) and pd.notna(total_val) and fp_rate_val != "" and total_val != "":
                     try:
-                        fp_3 += float(fp_val)
+                        fp_rate_val = float(fp_rate_val)
+                        total_val = float(total_val)
+                        # Weight by number of prompts
+                        fp_rate_3 += fp_rate_val * total_val
+                        total_prompts_3 += total_val
                     except (ValueError, TypeError):
                         pass
         
-        # Overall false positives
-        fp_overall = fp_2 + fp_3
+        # Calculate overall weighted false positive rate
+        fp_rate_overall = 0.0
+        total_prompts_overall = 0
+        all_case_types = case_types_2 + case_types_3
+        for case_type in all_case_types:
+            fp_rate_col = f"{case_type}_false_positive_rate"
+            total_col = f"{case_type}_total"
+            if fp_rate_col in df.columns and total_col in df.columns:
+                fp_rate_val = row.get(fp_rate_col)
+                total_val = row.get(total_col)
+                if pd.notna(fp_rate_val) and pd.notna(total_val) and fp_rate_val != "" and total_val != "":
+                    try:
+                        fp_rate_val = float(fp_rate_val)
+                        total_val = float(total_val)
+                        # Weight by number of prompts
+                        fp_rate_overall += fp_rate_val * total_val
+                        total_prompts_overall += total_val
+                    except (ValueError, TypeError):
+                        pass
         
-        false_positives_2.append(fp_2)
-        false_positives_3.append(fp_3)
-        overall_false_positives.append(fp_overall)
+        # Calculate weighted averages
+        fp_rates_2.append(fp_rate_2 / total_prompts_2 if total_prompts_2 > 0 else 0.0)
+        fp_rates_3.append(fp_rate_3 / total_prompts_3 if total_prompts_3 > 0 else 0.0)
+        overall_fp_rates.append(fp_rate_overall / total_prompts_overall if total_prompts_overall > 0 else 0.0)
     
     # Add false positive rate columns
-    df['overall_false_positive_rate'] = [
-        (fp / t * 100.0) if t > 0 else 0.0 
-        for fp, t in zip(overall_false_positives, overall_total)
-    ]
-    
-    df['false_positive_rate_2_colluders'] = [
-        (fp / t * 100.0) if t > 0 else 0.0 
-        for fp, t in zip(false_positives_2, success_2_total)
-    ]
-    
-    df['false_positive_rate_3_colluders'] = [
-        (fp / t * 100.0) if t > 0 else 0.0 
-        for fp, t in zip(false_positives_3, success_3_total)
-    ]
+    df['overall_false_positive_rate'] = overall_fp_rates
+    df['false_positive_rate_2_colluders'] = fp_rates_2
+    df['false_positive_rate_3_colluders'] = fp_rates_3
     
     # Sort by scheme, then group_bits, then user_bits, then num_colluders for consistent ordering
     sort_columns = ["scheme", "group_bits", "user_bits", "num_colluders"]

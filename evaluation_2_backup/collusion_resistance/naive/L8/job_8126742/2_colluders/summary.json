@@ -1,0 +1,30 @@
+{
+  "scheme": "naive",
+  "model": "gpt2",
+  "run_tag": "job_8126742",
+  "l_bits": 8,
+  "group_bits": null,
+  "user_bits": null,
+  "num_prompts": 300,
+  "random_seed": 70840946,
+  "output_directory": "/fred/oz411/kpham/crypto-watermark/evaluation/collusion_resistance/naive/L8/job_8126742",
+  "raw_results_file": null,
+  "generated_utc": "2026-01-03T20:31:10.910205Z",
+  "num_colluders": 2,
+  "success_rates": {
+    "same_group_2": {
+      "successful": 295,
+      "total": 300,
+      "success_rate": 98.33333333333333,
+      "false_positives": 8281,
+      "false_positive_rate": 2760.333333333333
+    },
+    "cross_group_2": {
+      "successful": 300,
+      "total": 300,
+      "success_rate": 100.0,
+      "false_positives": 8377,
+      "false_positive_rate": 2792.333333333333
+    }
+  }
+}
