@@ -95,7 +95,7 @@ def measure_initialization(muw, users_file: str, scheme_name: str) -> dict:
     """Measure initialization time, memory, and storage."""
     print(f"\n--- Measuring Initialization for {scheme_name} ---")
     
-    # Start memory tracking
+    # Measure memory BEFORE any file operations (ensures fair comparison)
     tracemalloc.start()
     memory_before = get_memory_mb()
     
@@ -103,17 +103,22 @@ def measure_initialization(muw, users_file: str, scheme_name: str) -> dict:
     start_time = time.perf_counter()
     
     # For fair comparison, limit all schemes to 128 users
+    # Load and limit users BEFORE calling load_users
     import tempfile
     df_all = pd.read_csv(users_file)
     if len(df_all) > 128:
         print(f"  Limiting to 128 users for {scheme_name} scheme (for fair comparison)")
         df_limited = df_all.head(128)
+        # Use temp file for BOTH schemes when limiting (ensures fair comparison)
         with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as tmp_file:
             df_limited.to_csv(tmp_file.name, index=False)
             tmp_users_path = tmp_file.name
-        muw.load_users(tmp_users_path)
-        os.unlink(tmp_users_path)
+        try:
+            muw.load_users(tmp_users_path)
+        finally:
+            os.unlink(tmp_users_path)
     else:
+        # No limiting needed - use original file for both schemes
         muw.load_users(users_file)
     
     init_time = time.perf_counter() - start_time
@@ -133,8 +138,11 @@ def measure_initialization(muw, users_file: str, scheme_name: str) -> dict:
         storage_mb = get_storage_size_mb(muw.group_codewords)
         num_groups = len(muw.group_codewords)
         if hasattr(muw, 'group_to_users') and muw.group_to_users:
-            # Get average users per group
-            users_per_group = sum(len(users) for users in muw.group_to_users.values()) / len(muw.group_to_users) if muw.group_to_users else 0
+            # Handle both dict and list formats (for future optimizations)
+            if isinstance(muw.group_to_users, dict):
+                users_per_group = sum(len(users) for users in muw.group_to_users.values()) / len(muw.group_to_users) if muw.group_to_users else 0
+            else:  # list format
+                users_per_group = sum(len(users) for users in muw.group_to_users) / len(muw.group_to_users) if muw.group_to_users else 0
     # Naive scheme: no storage (computed on-the-fly)
     
     return {
@@ -337,7 +345,11 @@ def measure_tracing(muw, master_key: bytes, text: str, recovered_codeword: str =
         num_groups_compared = len(muw.group_codewords)
         # Estimate users compared (typically 1-2 suspect groups * users_per_group)
         if hasattr(muw, 'group_to_users') and muw.group_to_users:
-            avg_users_per_group = sum(len(users) for users in muw.group_to_users.values()) / len(muw.group_to_users) if muw.group_to_users else 0
+            # Handle both dict and list formats (for future optimizations)
+            if isinstance(muw.group_to_users, dict):
+                avg_users_per_group = sum(len(users) for users in muw.group_to_users.values()) / len(muw.group_to_users) if muw.group_to_users else 0
+            else:  # list format
+                avg_users_per_group = sum(len(users) for users in muw.group_to_users) / len(muw.group_to_users) if muw.group_to_users else 0
             # Assume 1-2 suspect groups on average
             estimated_users_compared = min(2 * avg_users_per_group, N)
         else:

@@ -695,15 +695,88 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
             users_per_group=None  # Not used for group codeword generation
         )
         
-        # Store group codewords and user-to-group mapping
-        self.group_codewords: dict[int, str] = {}  # group_id -> codeword string
-        self.user_to_group: dict[int, int] = {}  # user_id -> group_id
-        self.group_to_users: dict[int, list[int]] = {}  # group_id -> list of user_ids
+        # Store group codewords (lazy generation - stored as integers for memory efficiency)
+        self.group_codewords: dict[int, int] = {}  # group_id -> codeword int (lazy-loaded)
+        # Don't store user_to_group - compute from index instead (saves memory)
+        # Use list instead of dict for group_to_users (more memory efficient)
+        self.group_to_users: list[list[int]] = []  # group_id (index) -> list of user_ids
+        self._num_groups: int = 0  # Store num_groups for lazy generation
+        self._users_per_group: int = 0  # Store users_per_group for computing group_id
+    
+    def _generate_single_group_codeword_int(self, group_id: int) -> int:
+        """
+        Generate a single group codeword as integer (lazy generation).
+        For min_distance=2, uses optimized even-parity computation.
+        
+        Args:
+            group_id: The group ID (0 to num_groups-1)
+            
+        Returns:
+            int: Codeword as integer (can be converted to binary string when needed)
+        """
+        if self.min_distance == 2:
+            L = self.group_bits
+            max_codewords = 2 ** (L - 1)
+            
+            if group_id >= max_codewords:
+                raise ValueError(
+                    f"Group ID {group_id} exceeds maximum allowed by group_bits={L} "
+                    f"and min_distance=2 (max {max_codewords - 1})"
+                )
+            
+            # Handle edge case: when L=1, only group 0 with codeword 0
+            if L == 1:
+                return 0
+            
+            # Optimized: compute codeword directly for group_id
+            # For group_id, base = group_id, append parity bit
+            base = group_id
+            base_parity = base.bit_count() % 2 if hasattr(int, 'bit_count') else bin(base).count('1') % 2
+            # Append bit to make total parity even: if base is even parity, append 0; if odd, append 1
+            parity_bit = 0 if base_parity == 0 else 1
+            # Combine: base shifted left by 1 bit, then add parity bit
+            codeword_int = (base << 1) | parity_bit
+            return codeword_int
+        else:
+            # For min_distance > 2, fall back to generating all codewords
+            raise NotImplementedError(
+                f"Lazy codeword generation not yet implemented for min_distance={self.min_distance}. "
+                "Please use min_distance=2 for optimized performance."
+            )
+    
+    def _get_group_codeword_int(self, group_id: int) -> int:
+        """
+        Get group codeword as integer (lazy generation with caching).
+        
+        Args:
+            group_id: The group ID
+            
+        Returns:
+            int: Codeword as integer
+        """
+        if group_id not in self.group_codewords:
+            # Generate on-demand
+            self.group_codewords[group_id] = self._generate_single_group_codeword_int(group_id)
+        return self.group_codewords[group_id]
+    
+    def _get_group_codeword_str(self, group_id: int) -> str:
+        """
+        Get group codeword as string (converts from cached int).
+        
+        Args:
+            group_id: The group ID
+            
+        Returns:
+            str: Codeword as binary string
+        """
+        codeword_int = self._get_group_codeword_int(group_id)
+        return format(codeword_int, f'0{self.group_bits}b')
     
     def _generate_group_codewords_direct(self, num_groups: int) -> dict[int, str]:
         """
         Generate group codewords directly without temp file (optimized).
         For min_distance=2, generates even-parity codewords efficiently.
+        NOTE: This is kept for backward compatibility but uses lazy generation internally.
         
         Args:
             num_groups: Number of group codewords to generate
@@ -726,46 +799,11 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
                 )
             
             # Handle edge case: when L=1, we can only have 1 group with codeword "0"
-            if L == 1:
-                if num_groups > 1:
-                    raise ValueError(
-                        f"Requested {num_groups} groups but min_distance=2 with 1 bit "
-                        f"only supports 1 group"
-                    )
-                return {0: "0"}
-            
+            # Use lazy generation to populate cache, then convert to strings for backward compatibility
             codewords = {}
-            count = 0
-            
-            # Pre-compute format templates (optimization #3)
-            format_template = f'0{L}b'
-            format_base_template = f'0{L-1}b'
-            
-            # Optimized even-parity generation: iterate only 2^(L-1) instead of 2^L (50% faster)
-            # For each base number, append a parity bit to make total parity even
-            # This generates the same codewords in the same order as the original method
-            try:
-                # Python 3.10+ has efficient bit_count()
-                for base in range(2 ** (L - 1)):
-                    base_parity = base.bit_count() % 2
-                    # Append bit to make total parity even: if base is even parity, append 0; if odd, append 1
-                    parity_bit = '0' if base_parity == 0 else '1'
-                    codeword_str = format(base, format_base_template) + parity_bit
-                    codewords[count] = codeword_str
-                    count += 1
-                    if count == num_groups:
-                        break
-            except AttributeError:
-                # Fallback for Python < 3.10: use bin().count('1')
-                for base in range(2 ** (L - 1)):
-                    base_parity = bin(base).count('1') % 2
-                    # Append bit to make total parity even: if base is even parity, append 0; if odd, append 1
-                    parity_bit = '0' if base_parity == 0 else '1'
-                    codeword_str = format(base, format_base_template) + parity_bit
-                    codewords[count] = codeword_str
-                    count += 1
-                    if count == num_groups:
-                        break
+            for group_id in range(num_groups):
+                codeword_int = self._generate_single_group_codeword_int(group_id)
+                codewords[group_id] = format(codeword_int, f'0{L}b')
             
             print(f"Generated {len(codewords)} group codewords directly "
                   f"(min_distance=2, {L} bits, max {max_codewords} possible)")
@@ -918,13 +956,14 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
                 f"group_bits={self.group_bits} and min_distance={self.min_distance} (max {max_possible_groups})"
             )
         
-        # Generate group codewords directly (optimized - no temp file needed)
-        # For min_distance=2, use optimized even-parity generation
-        # For other min_distance values, fall back to FingerprintingCode
-        if self.min_distance == 2:
-            # Optimized path: generate codewords directly
-            self.group_codewords = self._generate_group_codewords_direct(num_groups)
-        else:
+        # Store num_groups and users_per_group for lazy generation and group_id computation
+        self._num_groups = num_groups
+        self._users_per_group = users_per_group
+        
+        # Lazy codeword generation: don't generate all codewords upfront
+        # They will be generated on-demand when needed
+        # Only generate if min_distance > 2 (requires FingerprintingCode)
+        if self.min_distance != 2:
             # Fallback: use FingerprintingCode for min_distance > 2
             # This is less common, so we keep the original approach
             import tempfile
@@ -947,22 +986,24 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
             finally:
                 os.unlink(tmp_file_path)
             
-            # Extract group codewords
+            # Extract group codewords (store as int for consistency)
             for group_id in range(num_groups):
                 group_codeword_array = self.group_fingerprinter.codewords[group_id]
-                self.group_codewords[group_id] = "".join(map(str, group_codeword_array))
+                codeword_str = "".join(map(str, group_codeword_array))
+                # Convert to int for storage
+                self.group_codewords[group_id] = int(codeword_str, 2)
         
         # Assign users to groups and build mappings
-        # Pre-allocate lists for all groups (optimization #1: avoids repeated dict lookups)
-        self.user_to_group = {}
-        self.group_to_users = {gid: [] for gid in range(num_groups)}
+        # Use list instead of dict for group_to_users (more memory efficient)
+        # Don't store user_to_group - compute from index instead (saves memory)
+        self.group_to_users = [[] for _ in range(num_groups)]
         
         for index, row in self.user_metadata.iterrows():
             user_id = int(row["UserId"])
             # Use index instead of user_id to ensure groups are 0, 1, 2, ..., num_groups-1
             # This matches the group codewords that were generated for groups 0 to num_groups-1
             group_id = index // users_per_group
-            self.user_to_group[user_id] = group_id
+            # No need to store user_to_group - we can compute it from index
             self.group_to_users[group_id].append(user_id)
         
         print(f"Loaded {self.N} users into {num_groups} groups ({users_per_group} users per group)")
@@ -975,6 +1016,7 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
     def get_codeword_for_user(self, user_id: int) -> str:
         """
         Returns the combined L-bit codeword for a user: group_code + user_code.
+        Optimized: computes group_id from index instead of storing dict.
         
         Args:
             user_id (int): The user ID.
@@ -985,18 +1027,28 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
         self._require_metadata()
         self._validate_user_id(user_id)
         
-        # Get group ID
-        group_id = self.user_to_group.get(user_id)
-        if group_id is None:
-            raise ValueError(f"User ID {user_id} not assigned to any group.")
+        # Compute group_id from user index (no dict lookup needed)
+        # Find user index in sorted metadata
+        user_row = self.user_metadata[self.user_metadata['UserId'] == user_id]
+        if user_row.empty:
+            raise ValueError(f"User ID {user_id} not found in metadata.")
         
-        # Get group codeword
-        group_code = self.group_codewords.get(group_id)
-        if group_code is None:
-            raise ValueError(f"Group {group_id} codeword not found.")
+        user_index = user_row.index[0]
+        group_id = user_index // self._users_per_group
+        
+        # Validate group_id
+        if group_id >= self._num_groups:
+            raise ValueError(f"Computed group_id {group_id} exceeds num_groups {self._num_groups}.")
+        
+        # Get group codeword (lazy generation)
+        group_code = self._get_group_codeword_str(group_id)
         
         # Get user index within group
-        users_in_group = self.group_to_users.get(group_id, [])
+        if isinstance(self.group_to_users, dict):
+            users_in_group = self.group_to_users.get(group_id, [])
+        else:  # list format
+            users_in_group = self.group_to_users[group_id] if group_id < len(self.group_to_users) else []
+        
         try:
             user_index_in_group = users_in_group.index(user_id)
         except ValueError:
@@ -1019,18 +1071,24 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
         return combined_code
     
     def _log_embed(self, user_id: int, codeword: str):
-        group_id = self.user_to_group.get(user_id, None)
-        if group_id is not None:
-            group_code = codeword[:self.group_bits]
-            user_code = codeword[self.group_bits:] if self.user_bits > 0 else ""
-            print(f"User ID {user_id} belongs to Group {group_id}")
-            if self.user_bits == 0:
-                print(f"Embedding group-only codeword '{codeword}' for User ID {user_id} "
-                      f"(Group {group_id}: '{group_code}')...")
+        # Compute group_id from user index (optimized - no dict lookup)
+        try:
+            user_row = self.user_metadata[self.user_metadata['UserId'] == user_id]
+            if not user_row.empty:
+                user_index = user_row.index[0]
+                group_id = user_index // self._users_per_group
+                group_code = codeword[:self.group_bits]
+                user_code = codeword[self.group_bits:] if self.user_bits > 0 else ""
+                print(f"User ID {user_id} belongs to Group {group_id}")
+                if self.user_bits == 0:
+                    print(f"Embedding group-only codeword '{codeword}' for User ID {user_id} "
+                          f"(Group {group_id}: '{group_code}')...")
+                else:
+                    print(f"Embedding hierarchical codeword '{codeword}' for User ID {user_id} "
+                          f"(Group {group_id}: '{group_code}' + User: '{user_code}')...")
             else:
-                print(f"Embedding hierarchical codeword '{codeword}' for User ID {user_id} "
-                      f"(Group {group_id}: '{group_code}' + User: '{user_code}')...")
-        else:
+                print(f"Embedding codeword '{codeword}' for User ID {user_id} (hierarchical scheme)...")
+        except Exception:
             print(f"Embedding codeword '{codeword}' for User ID {user_id} (hierarchical scheme)...")
     
     def embed(self, master_key: bytes, user_id: int, prompt: str, **kwargs) -> str:
@@ -1089,9 +1147,11 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
             print("No valid bits in group part; cannot identify groups.")
             return []
         
-        # Calculate distances for all groups
+        # Calculate distances for all groups (lazy generation)
         group_distances = []
-        for group_id, group_codeword in self.group_codewords.items():
+        for group_id in range(self._num_groups):
+            # Get group codeword (lazy generation)
+            group_codeword = self._get_group_codeword_str(group_id)
             distance = sum(
                 recovered_group_bits[i] != group_codeword[i]
                 for i in valid_group_positions
@@ -1120,7 +1180,11 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
         if self.user_bits == 0:
             accused = []
             for group_id in suspect_groups:
-                users_in_group = self.group_to_users.get(group_id, [])
+                # Handle both dict and list formats
+                if isinstance(self.group_to_users, dict):
+                    users_in_group = self.group_to_users.get(group_id, [])
+                else:  # list format
+                    users_in_group = self.group_to_users[group_id] if group_id < len(self.group_to_users) else []
                 for user_id in users_in_group:
                     row = self.user_lookup.get(user_id)
                     accused.append({
@@ -1137,7 +1201,11 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
         best_full_distance = float('inf')
         
         for group_id in suspect_groups:
-            users_in_group = self.group_to_users.get(group_id, [])
+            # Handle both dict and list formats
+            if isinstance(self.group_to_users, dict):
+                users_in_group = self.group_to_users.get(group_id, [])
+            else:  # list format
+                users_in_group = self.group_to_users[group_id] if group_id < len(self.group_to_users) else []
             if not users_in_group:
                 continue
             
