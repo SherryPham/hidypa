@@ -14,7 +14,7 @@
     "scalability": {
       "current_users": 1000,
       "max_users_naive": 256,
-      "max_users_hierarchical": null,
+      "max_users_hi_dypa": null,
       "max_groups": null,
       "max_users_per_group": null,
       "l_bits": 8,

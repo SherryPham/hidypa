@@ -77,7 +77,7 @@ run_eval () {
             --run-tag ${RUN_TAG}
     else
         run_py evaluation_scripts/evaluate_paraphrasing_attack.py \
-            --scheme hierarchical \
+            --scheme hi_dypa \
             --group-bits "${group_bits}" \
             --user-bits "${user_bits}" \
             --l-bits 8 \
@@ -98,29 +98,29 @@ run_eval () {
 # Configuration 1: Naive (L=8, no hierarchy)
 run_eval "naive" 0 0 "Naive (L=8)"
 
-# Configuration 2: Hierarchical G=1, U=7
-run_eval "hierarchical" 1 7 "Hierarchical G=1, U=7"
+# Configuration 2: Hi-DyPa G=1, U=7
+run_eval "hi_dypa" 1 7 "Hi-DyPa G=1, U=7"
 
-# Configuration 3: Hierarchical G=2, U=6
-run_eval "hierarchical" 2 6 "Hierarchical G=2, U=6"
+# Configuration 3: Hi-DyPa G=2, U=6
+run_eval "hi_dypa" 2 6 "Hi-DyPa G=2, U=6"
 
-# Configuration 4: Hierarchical G=3, U=5
-run_eval "hierarchical" 3 5 "Hierarchical G=3, U=5"
+# Configuration 4: Hi-DyPa G=3, U=5
+run_eval "hi_dypa" 3 5 "Hi-DyPa G=3, U=5"
 
-# Configuration 5: Hierarchical G=4, U=4
-run_eval "hierarchical" 4 4 "Hierarchical G=4, U=4"
+# Configuration 5: Hi-DyPa G=4, U=4
+run_eval "hi_dypa" 4 4 "Hi-DyPa G=4, U=4"
 
-# Configuration 6: Hierarchical G=5, U=3
-run_eval "hierarchical" 5 3 "Hierarchical G=5, U=3"
+# Configuration 6: Hi-DyPa G=5, U=3
+run_eval "hi_dypa" 5 3 "Hi-DyPa G=5, U=3"
 
-# Configuration 7: Hierarchical G=6, U=2
-run_eval "hierarchical" 6 2 "Hierarchical G=6, U=2"
+# Configuration 7: Hi-DyPa G=6, U=2
+run_eval "hi_dypa" 6 2 "Hi-DyPa G=6, U=2"
 
-# Configuration 8: Hierarchical G=7, U=1
-run_eval "hierarchical" 7 1 "Hierarchical G=7, U=1"
+# Configuration 8: Hi-DyPa G=7, U=1
+run_eval "hi_dypa" 7 1 "Hi-DyPa G=7, U=1"
 
 # Configuration 9: Group-only G=8, U=0
-run_eval "hierarchical" 8 0 "Group-only G=8, U=0"
+run_eval "hi_dypa" 8 0 "Group-only G=8, U=0"
 
 echo ""
 echo "=========================================="

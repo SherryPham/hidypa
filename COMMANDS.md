@@ -1,4 +1,4 @@
-> **Note:** This file contains commands for running the watermarking schemes (zero-bit, L-bit, multi-user) only. For evaluation scripts (e.g., `evaluate_hierarchical_detection.py`, `compare_collusion_resistance.py`, `evaluate_synonym_attack.py`), see the README.md file.
+> **Note:** This file contains commands for running the watermarking schemes (zero-bit, L-bit, multi-user) only. For evaluation scripts (e.g., `evaluate_hi_dypa_detection.py`, `compare_collusion_resistance.py`, `evaluate_synonym_attack.py`), see the README.md file.
 
 ## Local quickstart (Windows cmd)
 
@@ -185,7 +185,7 @@ python -m src.main_multiuser trace ^
   demonstration/naive_user42.txt
 ```
 
-**Hierarchical Scheme (group codewords + per-user fingerprints):**
+**Hi-DyPa Scheme (group codewords + per-user fingerprints):**
 
 **Basic usage (automatic group/user allocation):**
 ```bat
@@ -194,12 +194,12 @@ python -m src.main_multiuser generate "The future of AI is" ^
   --model gpt2 ^
   --user-id 0 ^
   --l-bits 8 ^
-  --scheme hierarchical ^
+  --scheme hi_dypa ^
   --group-bits 6 ^
   --user-bits 2 ^
   --min-distance 2 ^
   --max-new-tokens 512 ^
-  -o demonstration/hierarchical_user0.txt
+  -o demonstration/hi_dypa_user0.txt
 ```
 
 **With explicit group/user control:**
@@ -209,14 +209,14 @@ python -m src.main_multiuser generate "The future of AI is" ^
   --model gpt2 ^
   --user-id 0 ^
   --l-bits 8 ^
-  --scheme hierarchical ^
+  --scheme hi_dypa ^
   --group-bits 6 ^
   --user-bits 2 ^
   --min-distance 2 ^
   --max-groups 32 ^
   --users-per-group 4 ^
   --max-new-tokens 512 ^
-  -o demonstration/hierarchical_user0.txt
+  -o demonstration/hi_dypa_user0.txt
 ```
 
 **Parameters:**
@@ -226,19 +226,19 @@ python -m src.main_multiuser generate "The future of AI is" ^
 - `--max-groups` (optional): Maximum number of groups allowed (default: auto-calculated)
 - `--users-per-group` (optional): Number of users per group (default: auto-calculated, max = 2^user_bits)
 
-**Trace hierarchical watermarked text:**
+**Trace hi_dypa watermarked text:**
 ```bat
 python -m src.main_multiuser trace ^
   --users-file assets/users.csv ^
   --model gpt2 ^
   --l-bits 8 ^
-  --scheme hierarchical ^
+  --scheme hi_dypa ^
   --group-bits 6 ^
   --user-bits 2 ^
   --min-distance 2 ^
   --max-groups 32 ^
   --users-per-group 4 ^
-  demonstration/hierarchical_user0.txt
+  demonstration/hi_dypa_user0.txt
 ```
 
 **Important:** Use the same `--group-bits`, `--user-bits`, `--min-distance`, `--max-groups`, and `--users-per-group` values that were used during generation.
@@ -248,7 +248,7 @@ python -m src.main_multiuser trace ^
 - `--users-per-group` must be ≤ 2^user_bits (e.g., with user_bits=2, max 4 users per group)
 - If CSV contains more users than `max_groups × users_per_group`, only the first N users are used
 
-**How Hierarchical Scheme Works:**
+**How Hi-DyPa Scheme Works:**
 - Combines group codewords (with minimum distance for cross-group collusion resistance) with per-user fingerprints
 - Each user's codeword = `group_code[group_bits] + user_code[user_bits]`
 - Group codewords are generated using BCH codes with guaranteed minimum Hamming distance

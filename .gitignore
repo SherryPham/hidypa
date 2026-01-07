@@ -6,3 +6,5 @@ slurm_out
 evaluation_results_lbit
 random_notes.txt
 
+# Helper script for renaming (one-time use)
+helper_scripts/rename_hierarchical_to_hidypa.py

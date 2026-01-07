@@ -628,9 +628,9 @@ class GroupedMultiUserWatermarker(NaiveMultiUserWatermarker):
         return accused_users
 
 
-class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
+class HiDyPaMultiUserWatermarker(NaiveMultiUserWatermarker):
     """
-    Hierarchical multi-user watermarking scheme that combines group codewords
+    Hi-DyPa multi-user watermarking scheme that combines group codewords
     (with minimum distance for cross-group collusion resistance) with per-user
     fingerprints within each group.
     
@@ -640,7 +640,7 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
                  user_bits: int, min_distance: int = 2, max_groups: int = None,
                  users_per_group: int = None):
         """
-        Initializes the hierarchical multi-user watermarker.
+        Initializes the hi_dypa multi-user watermarker.
         
         Args:
             lbit_watermarker (LBitWatermarker): The L-bit watermarker to use for embedding.
@@ -819,7 +819,7 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
     
     def load_users(self, users_file: str) -> pd.DataFrame:
         """
-        Loads user metadata and generates hierarchical codeword structure.
+        Loads user metadata and generates Hi-DyPa codeword structure.
         Uses FingerprintingCode to generate group codewords, then assigns
         simple binary fingerprints to users within each group.
         """
@@ -838,25 +838,25 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
         
         df = df.sort_values("UserId").reset_index(drop=True)
         
-        # Enforce hierarchical capacity rules early (before computing num_groups)
+        # Enforce Hi-DyPa capacity rules early (before computing num_groups)
         # For min_distance=2, max_groups = 2^(group_bits-1)
         if self.min_distance == 2:
             max_groups_allowed = 2 ** (self.group_bits - 1)
         else:
             max_groups_allowed = 2 ** self.group_bits
         
-        # Handle group-only mode (user_bits == 0) and hierarchical mode (user_bits > 0)
+        # Handle group-only mode (user_bits == 0) and Hi-DyPa mode (user_bits > 0)
         if self.user_bits == 0:
             # Group-only mode: one user per group
             max_users_allowed = max_groups_allowed
         else:
-            # Hierarchical mode: max_groups * users_per_group
+            # Hi-DyPa mode: max_groups * users_per_group
             users_per_group_auto = 2 ** self.user_bits
             max_users_allowed = max_groups_allowed * users_per_group_auto
         
         if len(df) > max_users_allowed:
             print(
-                f"Warning: users file contains {len(df)} entries but hierarchical config "
+                f"Warning: users file contains {len(df)} entries but Hi-DyPa config "
                 f"(G={self.group_bits}, U={self.user_bits}, min_distance={self.min_distance}) "
                 f"only supports {max_users_allowed} users. Truncating to {max_users_allowed}."
             )
@@ -909,12 +909,12 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
         self.N = len(df)
         self.user_lookup = {int(row["UserId"]): row for _, row in df.iterrows()}
         
-        # Truncate users to hierarchical capacity based on min_distance
+        # Truncate users to Hi-DyPa capacity based on min_distance
         # This ensures users don't get assigned to non-existent groups
         max_supported = theoretical_max_groups * users_per_group
         
         if self.N > max_supported:
-            print(f"Warning: CSV contains {self.N} users, but hierarchical config (G={self.group_bits}, U={self.user_bits}, min_distance={self.min_distance}) only supports {max_supported} users. Truncating to {max_supported}.")
+            print(f"Warning: CSV contains {self.N} users, but Hi-DyPa config (G={self.group_bits}, U={self.user_bits}, min_distance={self.min_distance}) only supports {max_supported} users. Truncating to {max_supported}.")
             self.user_metadata = self.user_metadata.head(max_supported)
             self.N = len(self.user_metadata)
             self.user_lookup = {int(row["UserId"]): row for _, row in self.user_metadata.iterrows()}
@@ -1084,15 +1084,15 @@ class HierarchicalMultiUserWatermarker(NaiveMultiUserWatermarker):
                     print(f"Embedding group-only codeword '{codeword}' for User ID {user_id} "
                           f"(Group {group_id}: '{group_code}')...")
                 else:
-                    print(f"Embedding hierarchical codeword '{codeword}' for User ID {user_id} "
+                    print(f"Embedding Hi-DyPa codeword '{codeword}' for User ID {user_id} "
                           f"(Group {group_id}: '{group_code}' + User: '{user_code}')...")
             else:
-                print(f"Embedding codeword '{codeword}' for User ID {user_id} (hierarchical scheme)...")
+                print(f"Embedding codeword '{codeword}' for User ID {user_id} (Hi-DyPa scheme)...")
         except Exception:
-            print(f"Embedding codeword '{codeword}' for User ID {user_id} (hierarchical scheme)...")
+            print(f"Embedding codeword '{codeword}' for User ID {user_id} (Hi-DyPa scheme)...")
     
     def embed(self, master_key: bytes, user_id: int, prompt: str, **kwargs) -> str:
-        """Embeds the hierarchical codeword for a user."""
+        """Embeds the Hi-DyPa codeword for a user."""
         self._require_metadata()
         self._validate_user_id(user_id)
         combined_code = self.get_codeword_for_user(user_id)

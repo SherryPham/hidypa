@@ -5,7 +5,7 @@ Convenience driver to run all synonym-attack configurations locally.
 This mirrors the pattern of other local evaluation scripts but is designed
 for a single workstation. It sequentially invokes
 `evaluation_scripts/evaluate_synonym_attack.py` for all nine schemes
-(naive baseline + eight hierarchical splits) and forwards shared arguments
+(naive baseline + eight hi_dypa splits) and forwards shared arguments
 such as the prompts file, number of prompts, and model selection.
 """
 
@@ -29,57 +29,57 @@ EVAL_SCRIPT = os.path.join(
 CONFIGS = [
     {"label": "Configuration 1: Naive (L=8)", "scheme": "naive", "l_bits": 8},
     {
-        "label": "Configuration 2: Hierarchical G=1, U=7",
-        "scheme": "hierarchical",
+        "label": "Configuration 2: Hi-DyPa G=1, U=7",
+        "scheme": "hi_dypa",
         "group_bits": 1,
         "user_bits": 7,
         "l_bits": 8,
     },
     {
-        "label": "Configuration 3: Hierarchical G=2, U=6",
-        "scheme": "hierarchical",
+        "label": "Configuration 3: Hi-DyPa G=2, U=6",
+        "scheme": "hi_dypa",
         "group_bits": 2,
         "user_bits": 6,
         "l_bits": 8,
     },
     {
-        "label": "Configuration 4: Hierarchical G=3, U=5",
-        "scheme": "hierarchical",
+        "label": "Configuration 4: Hi-DyPa G=3, U=5",
+        "scheme": "hi_dypa",
         "group_bits": 3,
         "user_bits": 5,
         "l_bits": 8,
     },
     {
-        "label": "Configuration 5: Hierarchical G=4, U=4",
-        "scheme": "hierarchical",
+        "label": "Configuration 5: Hi-DyPa G=4, U=4",
+        "scheme": "hi_dypa",
         "group_bits": 4,
         "user_bits": 4,
         "l_bits": 8,
     },
     {
-        "label": "Configuration 6: Hierarchical G=5, U=3",
-        "scheme": "hierarchical",
+        "label": "Configuration 6: Hi-DyPa G=5, U=3",
+        "scheme": "hi_dypa",
         "group_bits": 5,
         "user_bits": 3,
         "l_bits": 8,
     },
     {
-        "label": "Configuration 7: Hierarchical G=6, U=2",
-        "scheme": "hierarchical",
+        "label": "Configuration 7: Hi-DyPa G=6, U=2",
+        "scheme": "hi_dypa",
         "group_bits": 6,
         "user_bits": 2,
         "l_bits": 8,
     },
     {
-        "label": "Configuration 8: Hierarchical G=7, U=1",
-        "scheme": "hierarchical",
+        "label": "Configuration 8: Hi-DyPa G=7, U=1",
+        "scheme": "hi_dypa",
         "group_bits": 7,
         "user_bits": 1,
         "l_bits": 8,
     },
     {
-        "label": "Configuration 9: Hierarchical G=8, U=0",
-        "scheme": "hierarchical",
+        "label": "Configuration 9: Hi-DyPa G=8, U=0",
+        "scheme": "hi_dypa",
         "group_bits": 8,
         "user_bits": 0,
         "l_bits": 8,

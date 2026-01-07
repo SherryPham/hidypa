@@ -1,0 +1,21 @@
+{
+  "scheme": "hi_dypa",
+  "model": "gpt2",
+  "run_tag": "job_7904366",
+  "l_bits": 8,
+  "group_bits": 4,
+  "user_bits": 4,
+  "num_prompts": 300,
+  "random_seed": 794249190,
+  "output_directory": "/fred/oz411/kpham/crypto-watermark/evaluation/hi_dypa_detection/hi_dypa/G4_U4/job_7904366",
+  "raw_results_file": null,
+  "generated_utc": "2025-12-18T03:29:56.870010Z",
+  "metrics": {
+    "group_accuracy": 0.9466666666666667,
+    "user_accuracy": 0.9612676056338029,
+    "full_identity_accuracy": 0.91,
+    "lbit_accuracy": 0.86,
+    "false_positive_rate": 0.056666666666666664,
+    "false_negative_rate": 0.03333333333333333
+  }
+}

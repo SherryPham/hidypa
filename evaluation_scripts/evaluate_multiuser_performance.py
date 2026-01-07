@@ -1,6 +1,6 @@
 # evaluate_multiuser_performance.py
 # Script to evaluate performance metrics (memory, computation, storage) for multi-user watermarking schemes
-# Compares: naive and hierarchical schemes (with different group/user bit allocations)
+# Compares: naive and Hi-DyPa schemes (with different group/user bit allocations)
 
 import argparse
 import json
@@ -21,7 +21,7 @@ parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
 sys.path.insert(0, parent_dir)
 
 from src.models import GPT2Model, GptOssModel, GptOss120bModel
-from src.watermark import ZeroBitWatermarker, LBitWatermarker, NaiveMultiUserWatermarker, HierarchicalMultiUserWatermarker
+from src.watermark import ZeroBitWatermarker, LBitWatermarker, NaiveMultiUserWatermarker, HiDyPaMultiUserWatermarker
 
 
 def get_model(model_name: str):
@@ -133,7 +133,7 @@ def measure_initialization(muw, users_file: str, scheme_name: str) -> dict:
     num_groups = 0
     users_per_group = 0
     
-    # Hierarchical scheme: store group codewords
+    # Hi-DyPa scheme: store group codewords
     if hasattr(muw, 'group_codewords') and muw.group_codewords:
         storage_mb = get_storage_size_mb(muw.group_codewords)
         num_groups = len(muw.group_codewords)
@@ -311,13 +311,13 @@ def measure_tracing(muw, master_key: bytes, text: str, recovered_codeword: str =
     else:
         print(f"\n--- Measuring Tracing (comparisons only) ---")
     
-    # Count comparisons: N for naive, hierarchical uses group-based tracing
+    # Count comparisons: N for naive, hi_dypa uses group-based tracing
     N = muw.N
     expected_comparisons = N
     
     if hasattr(muw, 'group_codewords') and muw.group_codewords:
         num_groups = len(muw.group_codewords)
-        # Hierarchical scheme: first compare groups, then users within suspect groups
+        # Hi-DyPa scheme: first compare groups, then users within suspect groups
         # Typical: G group comparisons + users_in_suspect_groups user comparisons
         potential_optimized_comparisons = num_groups
     else:
@@ -341,7 +341,7 @@ def measure_tracing(muw, master_key: bytes, text: str, recovered_codeword: str =
     # Count actual comparisons made
     actual_comparisons = N  # Naive: N user comparisons
     if hasattr(muw, 'group_codewords') and muw.group_codewords:
-        # Hierarchical: G group comparisons + users in suspect groups
+        # Hi-DyPa: G group comparisons + users in suspect groups
         num_groups_compared = len(muw.group_codewords)
         # Estimate users compared (typically 1-2 suspect groups * users_per_group)
         if hasattr(muw, 'group_to_users') and muw.group_to_users:
@@ -377,19 +377,19 @@ def measure_scalability(users_file: str, L: int, group_bits: int = None, user_bi
     max_users_naive = 2 ** L
     
     if group_bits is not None and user_bits is not None:
-        # Hierarchical scheme: max_groups = 2^group_bits, max_users_per_group = 2^user_bits
+        # Hi-DyPa scheme: max_groups = 2^group_bits, max_users_per_group = 2^user_bits
         max_groups = 2 ** group_bits
         max_users_per_group = 2 ** user_bits
-        max_users_hierarchical = max_groups * max_users_per_group
+        max_users_hi_dypa = max_groups * max_users_per_group
     else:
         max_groups = None
         max_users_per_group = None
-        max_users_hierarchical = None
+        max_users_hi_dypa = None
     
     return {
         'current_users': N,
         'max_users_naive': max_users_naive,
-        'max_users_hierarchical': max_users_hierarchical,
+        'max_users_hi_dypa': max_users_hi_dypa,
         'max_groups': max_groups,
         'max_users_per_group': max_users_per_group,
         'l_bits': L,
@@ -441,13 +441,13 @@ def main():
         '--group-bits',
         type=int,
         default=None,
-        help='Number of bits for group codewords (for hierarchical scheme, required if testing hierarchical)'
+        help='Number of bits for group codewords (for Hi-DyPa scheme, required if testing hi_dypa)'
     )
     parser.add_argument(
         '--user-bits',
         type=int,
         default=None,
-        help='Number of bits for user fingerprints (for hierarchical scheme, required if testing hierarchical)'
+        help='Number of bits for user fingerprints (for Hi-DyPa scheme, required if testing hi_dypa)'
     )
     parser.add_argument(
         '--delta',
@@ -534,9 +534,9 @@ def main():
         help='Path to seeds.txt file to read existing seeds from (optional). If provided and seed exists for this config, it will be reused.'
     )
     parser.add_argument(
-        '--hierarchical-only',
+        '--hi_dypa-only',
         action='store_true',
-        help='If set, only evaluate hierarchical scheme (skip naive baseline)'
+        help='If set, only evaluate Hi-DyPa scheme (skip naive baseline)'
     )
     parser.add_argument(
         '--unified-summary-path',
@@ -568,10 +568,10 @@ def main():
     print("=" * 80)
     print(f"Model: {args.model}")
     print(f"L-bits: {args.l_bits}")
-    if args.hierarchical_only:
-        print("Mode: Hierarchical-only (naive skipped)")
+    if args.hi_dypa_only:
+        print("Mode: Hi-DyPa-only (naive skipped)")
     if args.group_bits is not None and args.user_bits is not None:
-        print(f"Hierarchical: G={args.group_bits}, U={args.user_bits}")
+        print(f"Hi-DyPa: G={args.group_bits}, U={args.user_bits}")
     
     # Determine which users to test
     if args.user_id is not None:
@@ -613,10 +613,10 @@ def main():
     )
     lbw = LBitWatermarker(zero_bit_watermarker=zbw, L=args.l_bits)
     
-    # Test schemes: naive and hierarchical (if group_bits/user_bits provided)
+    # Test schemes: naive and hi_dypa (if group_bits/user_bits provided)
     schemes = []
     
-    if not args.hierarchical_only:
+    if not args.hi_dypa_only:
         schemes.append(('naive', None, None, None))
     
     if args.group_bits is not None and args.user_bits is not None:
@@ -625,10 +625,10 @@ def main():
                 f"--group-bits ({args.group_bits}) + --user-bits ({args.user_bits}) "
                 f"must equal --l-bits ({args.l_bits})"
             )
-        schemes.append(('hierarchical', args.group_bits, args.user_bits, 2))  # min_distance=2 for hierarchical
+        schemes.append(('hi_dypa', args.group_bits, args.user_bits, 2))  # min_distance=2 for hi_dypa
     
     if not schemes:
-        raise ValueError("No schemes to evaluate. Either provide --group-bits/--user-bits or omit --hierarchical-only")
+        raise ValueError("No schemes to evaluate. Either provide --group-bits/--user-bits or omit --hi_dypa-only")
     
     # Pre-measure baselines for all prompts (shared across all schemes)
     print(f"\n{'=' * 80}")
@@ -650,7 +650,7 @@ def main():
     
     for scheme_name, group_bits, user_bits, min_distance in schemes:
         print(f"\n{'=' * 80}")
-        if scheme_name == 'hierarchical':
+        if scheme_name == 'hi_dypa':
             print(f"Evaluating Scheme: {scheme_name} (G={group_bits}, U={user_bits})")
         else:
             print(f"Evaluating Scheme: {scheme_name}")
@@ -659,8 +659,8 @@ def main():
         # Create watermarker
         if scheme_name == 'naive':
             muw = NaiveMultiUserWatermarker(lbit_watermarker=lbw)
-        else:  # hierarchical
-            muw = HierarchicalMultiUserWatermarker(
+        else:  # hi_dypa
+            muw = HiDyPaMultiUserWatermarker(
                 lbit_watermarker=lbw,
                 group_bits=group_bits,
                 user_bits=user_bits,
@@ -792,8 +792,8 @@ def main():
         results = all_results[scheme_name]
         
         # Create scheme label
-        if scheme_name == 'hierarchical':
-            scheme_label = f"hierarchical_G{scheme_tuple[1]}_U{scheme_tuple[2]}"
+        if scheme_name == 'hi_dypa':
+            scheme_label = f"hi_dypa_G{scheme_tuple[1]}_U{scheme_tuple[2]}"
         else:
             scheme_label = scheme_name
         
@@ -833,8 +833,8 @@ def main():
             scale = results['scalability']
             if scheme_name == 'naive':
                 row['max_users'] = scale.get('max_users_naive', 0)
-            else:  # hierarchical
-                row['max_users'] = scale.get('max_users_hierarchical', 0)
+            else:  # hi_dypa
+                row['max_users'] = scale.get('max_users_hi_dypa', 0)
                 row['max_groups'] = scale.get('max_groups', 0)
                 row['max_users_per_group'] = scale.get('max_users_per_group', 0)
                 row['group_bits'] = scale.get('group_bits', 0)

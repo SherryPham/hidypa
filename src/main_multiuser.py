@@ -15,7 +15,7 @@ from src.watermark import (
     LBitWatermarker,
     NaiveMultiUserWatermarker,
     GroupedMultiUserWatermarker,
-    HierarchicalMultiUserWatermarker,
+    HiDyPaMultiUserWatermarker,
 )
 
 def parse_final_output(raw_text: str, model_name: str) -> str:
@@ -62,7 +62,7 @@ def main():
         '--scheme',
         type=str,
         default='grouped',
-        choices=['naive', 'grouped', 'hierarchical'],
+        choices=['naive', 'grouped', 'hi_dypa'],
         help="Multi-user scheme to use (default: grouped).",
     )
     base_parser.add_argument('--min-distance', type=int, default=2, choices=[2, 3],
@@ -72,9 +72,9 @@ def main():
     base_parser.add_argument('--users-per-group', type=int, default=None,
                             help="Number of users per group (default: auto-calculated based on min-distance).")
     base_parser.add_argument('--group-bits', type=int, default=None,
-                            help="Number of bits for group codewords (required for hierarchical scheme).")
+                            help="Number of bits for group codewords (required for Hi-DyPa scheme).")
     base_parser.add_argument('--user-bits', type=int, default=None,
-                            help="Number of bits for user fingerprints within groups (required for hierarchical scheme).")
+                            help="Number of bits for user fingerprints within groups (required for Hi-DyPa scheme).")
 
     # --- Generate Command ---
     gen_parser = subparsers.add_parser('generate', help='Generate text watermarked for a specific user.', parents=[base_parser])
@@ -104,14 +104,14 @@ def main():
     )
     lbw = LBitWatermarker(zero_bit_watermarker=zbw, L=args.l_bits)
     
-    if args.scheme == 'hierarchical':
+    if args.scheme == 'hi_dypa':
         if args.group_bits is None or args.user_bits is None:
-            print("Error: --group-bits and --user-bits are required for hierarchical scheme.")
+            print("Error: --group-bits and --user-bits are required for Hi-DyPa scheme.")
             return
         if args.group_bits + args.user_bits != args.l_bits:
             print(f"Error: --group-bits ({args.group_bits}) + --user-bits ({args.user_bits}) must equal --l-bits ({args.l_bits}).")
             return
-        muw = HierarchicalMultiUserWatermarker(
+        muw = HiDyPaMultiUserWatermarker(
             lbit_watermarker=lbw,
             group_bits=args.group_bits,
             user_bits=args.user_bits,

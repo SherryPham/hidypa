@@ -24,7 +24,7 @@ from src.watermark import (
     ZeroBitWatermarker,
     LBitWatermarker,
     NaiveMultiUserWatermarker,
-    HierarchicalMultiUserWatermarker,
+    HiDyPaMultiUserWatermarker,
     derive_key,
 )
 from src.utils import get_model, parse_final_output
@@ -197,10 +197,10 @@ def decode_naive_user(muw, recovered_codeword: str) -> int | None:
     return best_user_id
 
 
-def decode_hierarchical_user(
+def decode_hi_dypa_user(
     muw, recovered_codeword: str, true_user_id: int | None = None
 ) -> tuple[int | None, int | None, int | None]:
-    """Decode group ID and user ID from recovered codeword for hierarchical scheme."""
+    """Decode group ID and user ID from recovered codeword for Hi-DyPa scheme."""
     if len(recovered_codeword) != muw.lbw.L:
         return None, None, None
 
@@ -339,7 +339,7 @@ def evaluate_prompt_with_paraphrase(
                     detected_group_id,
                     detected_user_id,
                     true_group_id,
-                ) = decode_hierarchical_user(muw, recovered_codeword, true_user_id)
+                ) = decode_hi_dypa_user(muw, recovered_codeword, true_user_id)
                 
                 result["true_group_id"] = true_group_id
                 result["detected_group_id"] = detected_group_id
@@ -475,7 +475,7 @@ def compute_metrics_by_variant(all_results: list[dict], scheme: str) -> dict:
     
     Args:
         all_results: List of all per-attack result dictionaries
-        scheme: 'naive' or 'hierarchical'
+        scheme: 'naive' or 'hi_dypa'
     
     Returns:
         Dictionary mapping variant keys to metrics dicts
@@ -526,27 +526,27 @@ def save_summary_csv(summary_path: str, summary: dict) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Evaluate paraphrasing attacks on hierarchical multi-user watermarking",
+        description="Evaluate paraphrasing attacks on hi_dypa multi-user watermarking",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
         "--scheme",
         type=str,
         required=True,
-        choices=["naive", "hierarchical"],
-        help="Watermarking scheme to use: naive or hierarchical",
+        choices=["naive", "hi_dypa"],
+        help="Watermarking scheme to use: naive or hi_dypa",
     )
     parser.add_argument(
         "--group-bits",
         type=int,
         default=None,
-        help="Number of bits for group codewords (required for hierarchical scheme)",
+        help="Number of bits for group codewords (required for Hi-DyPa scheme)",
     )
     parser.add_argument(
         "--user-bits",
         type=int,
         default=None,
-        help="Number of bits for user fingerprints (required for hierarchical scheme)",
+        help="Number of bits for user fingerprints (required for Hi-DyPa scheme)",
     )
     parser.add_argument(
         "--l-bits",
@@ -647,16 +647,16 @@ def main():
 
     args = parser.parse_args()
 
-    if args.scheme == "hierarchical":
+    if args.scheme == "hi_dypa":
         if args.group_bits is None or args.user_bits is None:
-            parser.error("--group-bits and --user-bits are required for hierarchical scheme")
+            parser.error("--group-bits and --user-bits are required for Hi-DyPa scheme")
         if args.group_bits + args.user_bits != args.l_bits:
             parser.error(
                 f"--group-bits ({args.group_bits}) + --user-bits ({args.user_bits}) must equal --l-bits ({args.l_bits})"
             )
 
-    if args.scheme == "hierarchical":
-        scheme_dir_parts = ["hierarchical", f"G{args.group_bits}_U{args.user_bits}"]
+    if args.scheme == "hi_dypa":
+        scheme_dir_parts = ["hi_dypa", f"G{args.group_bits}_U{args.user_bits}"]
     else:
         scheme_dir_parts = ["naive", f"L{args.l_bits}"]
 
@@ -684,8 +684,8 @@ def main():
             
             if os.path.exists(seeds_file_path):
                 # Generate config name to check
-                if args.scheme == "hierarchical":
-                    config_name = f"hierarchical_G{args.group_bits}_U{args.user_bits}"
+                if args.scheme == "hi_dypa":
+                    config_name = f"hi_dypa_G{args.group_bits}_U{args.user_bits}"
                 else:
                     config_name = f"naive_L{args.l_bits}"
                 
@@ -703,8 +703,8 @@ def main():
         seed = int(time.time() * 1000) % (2**31)
     
     # Generate config name for seeds.txt
-    if args.scheme == "hierarchical":
-        config_name = f"hierarchical_G{args.group_bits}_U{args.user_bits}"
+    if args.scheme == "hi_dypa":
+        config_name = f"hi_dypa_G{args.group_bits}_U{args.user_bits}"
     else:
         config_name = f"naive_L{args.l_bits}"
     
@@ -742,7 +742,7 @@ def main():
     print("=" * 80)
     print("\nConfiguration:")
     print(f"  • Scheme: {args.scheme}")
-    if args.scheme == "hierarchical":
+    if args.scheme == "hi_dypa":
         print(f"  • Group bits: {args.group_bits}")
         print(f"  • User bits: {args.user_bits}")
     print(f"  • L-bits: {args.l_bits}")
@@ -783,8 +783,8 @@ def main():
     )
     lbit_watermarker = LBitWatermarker(zero_bit_watermarker=zero_bit, L=args.l_bits)
 
-    if args.scheme == "hierarchical":
-        muw = HierarchicalMultiUserWatermarker(
+    if args.scheme == "hi_dypa":
+        muw = HiDyPaMultiUserWatermarker(
             lbit_watermarker=lbit_watermarker,
             group_bits=args.group_bits,
             user_bits=args.user_bits,
@@ -866,8 +866,8 @@ def main():
         "model": args.model,
         "run_tag": args.run_tag,
         "l_bits": args.l_bits,
-        "group_bits": args.group_bits if args.scheme == "hierarchical" else None,
-        "user_bits": args.user_bits if args.scheme == "hierarchical" else None,
+        "group_bits": args.group_bits if args.scheme == "hi_dypa" else None,
+        "user_bits": args.user_bits if args.scheme == "hi_dypa" else None,
         "num_prompts": len(prompts),
         "num_attack_variants_per_prompt": 16,
         "total_attack_results": len(all_results),

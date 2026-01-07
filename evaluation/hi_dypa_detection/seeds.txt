@@ -1,0 +1,15 @@
+# Random seeds used for user selection in detection evaluation
+# Model: gpt2
+# Run tag: job_7904366
+# Generated: 2025-12-18 10:39:58
+# Format: config_name: seed_value
+
+naive_L8: 783239822
+hi_dypa_G1_U7: 786013081
+hi_dypa_G2_U6: 788875819
+hi_dypa_G3_U5: 791571745
+hi_dypa_G4_U4: 794249190
+hi_dypa_G5_U3: 797047915
+hi_dypa_G6_U2: 799803235
+hi_dypa_G7_U1: 802700858
+hi_dypa_G8_U0: 805525092

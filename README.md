@@ -51,7 +51,7 @@ This repository implements cryptographic watermarking techniques for LLM text ge
   3. Embed the user's group codeword using L-bit watermarking
   4. During tracing, match recovered codeword to group(s) and identify accused users
 
-- **Hierarchical Scheme:**
+- **Hi-DyPa Scheme:**
   1. Generate group codewords with minimum Hamming distance (for cross-group collusion resistance)
   2. Assign simple binary fingerprints to users within each group
   3. Combine group codeword + user fingerprint to create L-bit message
@@ -87,7 +87,7 @@ Cryptographic-Watermarking-for-LLM/
 │   │                                  - LBitWatermarker
 │   │                                  - NaiveMultiUserWatermarker
 │   │                                  - GroupedMultiUserWatermarker
-│   │                                  - HierarchicalMultiUserWatermarker
+│   │                                  - HiDyPaMultiUserWatermarker
 │   ├── models.py                    # Model abstractions (GPT-2, GPT-OSS variants)
 │   ├── fingerprinting.py            # Multi-user codeword generation & tracing
 │   ├── commands.py                  # CLI command handlers
@@ -98,8 +98,8 @@ Cryptographic-Watermarking-for-LLM/
 ├── evaluation_scripts/              # Evaluation and experiment scripts
 │   ├── compare_collusion_resistance.py  # Compare naive vs fingerprinting approaches
 │   ├── evaluate_multiuser_performance.py  # Multi-user performance evaluation
-│   ├── evaluate_hierarchical_detection.py  # Pure detection performance for hierarchical schemes
-│   ├── evaluate_hierarchical_robustness.py  # Robustness to deletion attacks for hierarchical schemes
+│   ├── evaluate_hi_dypa_detection.py  # Pure detection performance for Hi-DyPa schemes
+│   ├── evaluate_hi_dypa_robustness.py  # Robustness to deletion attacks for Hi-DyPa schemes
 │   ├── evaluate_paraphrasing_attack.py  # Robustness to paraphrasing (T5-small) attacks
 │   ├── evaluate_synonym_attack.py  # Robustness to synonym substitution attacks
 │   ├── evaluate_rewrite_attack.py  # Robustness to LLM rewrite attacks
@@ -107,9 +107,9 @@ Cryptographic-Watermarking-for-LLM/
 │   └── run_lbit_parameter_sweep.py  # L-bit parameter sweep (alternative)
 │
 ├── evaluation_scripts_local/        # Local convenience wrappers for evaluation scripts
-│   ├── run_hierarchical_detection_local.py  # Run hierarchical detection evaluation locally
-│   ├── run_hierarchical_performance_local.py  # Run hierarchical performance evaluation locally
-│   ├── run_hierarchical_robustness_local.py  # Run hierarchical robustness evaluation locally
+│   ├── run_hi_dypa_detection_local.py  # Run hi_dypa detection evaluation locally
+│   ├── run_hi_dypa_performance_local.py  # Run hi_dypa performance evaluation locally
+│   ├── run_hi_dypa_robustness_local.py  # Run hi_dypa robustness evaluation locally
 │   ├── run_paraphrasing_attack_local.py  # Run paraphrasing attack evaluation locally
 │   ├── run_rewrite_attack_local.py  # Run rewrite attack evaluation locally
 │   ├── run_synonym_attack_local.py  # Run synonym attack evaluation locally
@@ -130,8 +130,8 @@ Cryptographic-Watermarking-for-LLM/
 │   ├── run_collusion_eval_hpc.sh    # Collusion resistance evaluation
 │   ├── run_multiuser_performance_eval_hpc.sh  # Multi-user performance evaluation
 │   ├── run_lbit_sweep_hpc.sh        # L-bit parameter sweep
-│   ├── run_hierarchical_detection_hpc.sh  # Hierarchical detection evaluation
-│   ├── run_hierarchical_robustness_hpc.sh  # Hierarchical robustness evaluation
+│   ├── run_hi_dypa_detection_hpc.sh  # Hi-DyPa detection evaluation
+│   ├── run_hi_dypa_robustness_hpc.sh  # Hi-DyPa robustness evaluation
 │   ├── run_paraphrasing_attack_hpc.sh  # Paraphrasing attack evaluation (T5-small)
 │   ├── run_synonym_attack_hpc.sh    # Synonym substitution attack evaluation
 │   └── run_rewrite_attack_hpc.sh    # Rewrite attack evaluation
@@ -141,32 +141,32 @@ Cryptographic-Watermarking-for-LLM/
 │   └── prompts.txt                  # Evaluation prompts (typically 300+)
 │
 ├── evaluation/                      # Evaluation results (auto-created by HPC jobs)
-│   ├── hierarchical_detection/      # Detection performance results
+│   ├── hi_dypa_detection/      # Detection performance results
 │   │   ├── naive/L8/job_*/          # Naive L=8 results
-│   │   ├── hierarchical/G*_U*/job_*/ # Hierarchical results per config
+│   │   ├── hi_dypa/G*_U*/job_*/ # Hi-DyPa results per config
 │   │   ├── seeds.txt                # Random seeds used
 │   │   └── summary_all_configs.csv  # Aggregated summary across all configs
 │   ├── robustness/                  # Deletion attack robustness results
 │   │   ├── naive/L8/job_*/          # Naive L=8 results
-│   │   ├── hierarchical/G*_U*/job_*/ # Hierarchical results per config
+│   │   ├── hi_dypa/G*_U*/job_*/ # Hi-DyPa results per config
 │   │   ├── seeds.txt
 │   │   ├── summary_all_configs.csv
 │   │   └── summary_all_configs_concise.csv
 │   ├── paraphrasing_attack/         # T5-small paraphrasing attack results
 │   │   ├── naive/L8/job_*/
-│   │   ├── hierarchical/G*_U*/job_*/
+│   │   ├── hi_dypa/G*_U*/job_*/
 │   │   ├── seeds.txt
 │   │   ├── summary_all_configs.csv
 │   │   └── summary_all_configs_concise.csv
 │   ├── synonym_attack/              # WordNet synonym substitution attack results
 │   │   ├── naive/L8/job_*/
-│   │   ├── hierarchical/G*_U*/job_*/
+│   │   ├── hi_dypa/G*_U*/job_*/
 │   │   ├── seeds.txt
 │   │   ├── summary_all_configs.csv
 │   │   └── summary_all_configs_concise.csv
 │   └── rewrite_attack/              # LLM rewrite attack results
 │       ├── naive/L8/job_*/
-│       ├── hierarchical/G*_U*/job_*/
+│       ├── hi_dypa/G*_U*/job_*/
 │       ├── seeds.txt
 │       ├── summary_all_configs.csv
 │       └── summary_all_configs_concise.csv
@@ -174,11 +174,11 @@ Cryptographic-Watermarking-for-LLM/
 ├── evaluation_2_backup/             # Backup of multiuser performance results
 │   └── multiuser_performance/
 │       ├── naive/L8/
-│       ├── hierarchical/G*_U*/
+│       ├── hi_dypa/G*_U*/
 │       └── performance_summary.csv
 │
 └── demonstration/                   # Example outputs
-    └── hierarchical_user0.txt       # Hierarchical scheme example (user 0)
+    └── hi_dypa_user0.txt       # Hi-DyPa scheme example (user 0)
 ```
 
 ---
@@ -696,7 +696,7 @@ python evaluation_scripts\compare_collusion_resistance.py ^
 ```
 
 **Features:**
-- Evaluates 9 configurations: naive (L=8) and hierarchical (G=1,U=7 through G=8,U=0)
+- Evaluates 9 configurations: naive (L=8) and hi_dypa (G=1,U=7 through G=8,U=0)
 - Uses the same sampled colluding users across schemes per prompt (fair comparison)
 - Supports multiple collusion patterns:
   - 2 colluders: `same_group_2`, `cross_group_2`
@@ -712,14 +712,14 @@ python evaluation_scripts\compare_collusion_resistance.py ^
   - Per‑case success counts/rates (same/cross/mixed, 2‑ and 3‑colluder)
   - Aggregate success rates: `overall_success_rate`, `success_rate_2_colluders`, `success_rate_3_colluders`
   - Aggregate false‑positive rates: `overall_false_positive_rate`, `false_positive_rate_2_colluders`, `false_positive_rate_3_colluders`
-  - One row per configuration × colluder count (18 rows for naive + 8 hierarchical configs × {2,3} colluders)
+  - One row per configuration × colluder count (18 rows for naive + 8 Hi-DyPa configs × {2,3} colluders)
 
-#### `evaluation_scripts/evaluate_hierarchical_detection.py`
-**Purpose:** Evaluate pure detection performance (no collusion) for hierarchical multi-user watermarking at L=8, across all allocations of group bits and user bits
+#### `evaluation_scripts/evaluate_hi_dypa_detection.py`
+**Purpose:** Evaluate pure detection performance (no collusion) for hi_dypa multi-user watermarking at L=8, across all allocations of group bits and user bits
 **Usage:**
 ```bat
-python evaluation_scripts/evaluate_hierarchical_detection.py ^
-  --scheme hierarchical ^
+python evaluation_scripts/evaluate_hi_dypa_detection.py ^
+  --scheme hi_dypa ^
   --group-bits 4 ^
   --user-bits 4 ^
   --l-bits 8 ^
@@ -732,23 +732,23 @@ python evaluation_scripts/evaluate_hierarchical_detection.py ^
   --hashing-context 5 ^
   --z-threshold 4.0 ^
   --max-new-tokens 512 ^
-  --output-dir evaluation/hierarchical_detection
+  --output-dir evaluation/hi_dypa_detection
 ```
 
 **Features:**
-- Evaluates 9 configurations: naive (L=8) and hierarchical (G=1,U=7 through G=8,U=0)
+- Evaluates 9 configurations: naive (L=8) and hi_dypa (G=1,U=7 through G=8,U=0)
 - For each prompt: chooses random user, embeds watermark, detects codeword, decodes IDs
 - Logs per-prompt: true/detected IDs, codewords, Hamming distance, z-scores, match statuses
 - Computes metrics: group accuracy, user accuracy, full identity accuracy, L-bit accuracy, false positive/negative rates
 - Saves per-prompt JSON files and summary JSON
-- Supports both naive and hierarchical schemes
+- Supports both naive and Hi-DyPa schemes
 
-#### `evaluation_scripts/evaluate_hierarchical_robustness.py`
-**Purpose:** Evaluate robustness to deletion attacks for hierarchical multi-user watermarking at L=8, across all allocations of group bits and user bits
+#### `evaluation_scripts/evaluate_hi_dypa_robustness.py`
+**Purpose:** Evaluate robustness to deletion attacks for hi_dypa multi-user watermarking at L=8, across all allocations of group bits and user bits
 **Usage:**
 ```bat
-python evaluation_scripts/evaluate_hierarchical_robustness.py ^
-  --scheme hierarchical ^
+python evaluation_scripts/evaluate_hi_dypa_robustness.py ^
+  --scheme hi_dypa ^
   --group-bits 4 ^
   --user-bits 4 ^
   --l-bits 8 ^
@@ -765,7 +765,7 @@ python evaluation_scripts/evaluate_hierarchical_robustness.py ^
 ```
 
 **Features:**
-- Same structure as `evaluate_hierarchical_detection.py` but tests robustness to deletion attacks
+- Same structure as `evaluate_hi_dypa_detection.py` but tests robustness to deletion attacks
 - Tests 16 attack variants per prompt: 4 deletion percents (0.05, 0.10, 0.15, 0.20) × 4 deletion modes (start, middle, end, random)
 - For each attack variant: applies deletion, detects codeword, decodes IDs, computes metrics
 - Logs per-attack: `deletion_percent`, `deletion_mode`, recovered codeword, Hamming distance, z-scores, match statuses
@@ -775,14 +775,14 @@ python evaluation_scripts/evaluate_hierarchical_robustness.py ^
     - `metrics`: aggregate metrics over all 16 variants
     - `metrics_by_variant`: metrics for each specific (percent, mode) variant
   - `summary.csv` stores the aggregate `metrics` as a simple metric/value table for that configuration
-- Supports both naive and hierarchical schemes
+- Supports both naive and Hi-DyPa schemes
 
 #### `evaluation_scripts/evaluate_paraphrasing_attack.py`
-**Purpose:** Evaluate robustness against paraphrasing attacks (single-pass T5-small) for both naive and hierarchical schemes at L=8
+**Purpose:** Evaluate robustness against paraphrasing attacks (single-pass T5-small) for both naive and Hi-DyPa schemes at L=8
 **Usage:**
 ```bat
 python evaluation_scripts/evaluate_paraphrasing_attack.py ^
-  --scheme hierarchical ^
+  --scheme hi_dypa ^
   --group-bits 4 ^
   --user-bits 4 ^
   --l-bits 8 ^
@@ -801,7 +801,7 @@ python evaluation_scripts/evaluate_paraphrasing_attack.py ^
 **Features:**
 - Tests 16 attack variants per prompt: 4 paraphrase ratios (0.05, 0.10, 0.15, 0.20) × 4 modes (start, middle, end, random)
 - Mirrors the robustness workflow but uses T5-small paraphrasing instead of deletion attacks
-- Evaluates naive plus all eight hierarchical splits (G=1,U=7 … G=8,U=0) in a single run
+- Evaluates naive plus all eight hi_dypa splits (G=1,U=7 … G=8,U=0) in a single run
 - Records per-attack variant: `paraphrase_ratio`, `paraphrase_mode`, recovered codeword, invalid symbols, Hamming distance, z-score, group/user matches
 - Computes the same metrics as robustness (group/user/full accuracy, L-bit accuracy, false positive/negative rates, averages)
 - Saves all attack results to a single `raw_results.jsonl.gz` file (if enabled) and per‑configuration `summary.json` / `summary.csv` under `evaluation/paraphrasing_attack`
@@ -809,11 +809,11 @@ python evaluation_scripts/evaluate_paraphrasing_attack.py ^
   - Local aggregation (`run_paraphrasing_attack_local.py`) produces `evaluation/paraphrasing_attack/summary_all_configs.csv` with one row **per variant per configuration** (16 rows per config), including variant columns and all metrics
 
 #### `evaluation_scripts/evaluate_synonym_attack.py`
-**Purpose:** Evaluate robustness against synonym substitution attacks (WordNet, 10% of tokens) for both naive and hierarchical schemes at L=8
+**Purpose:** Evaluate robustness against synonym substitution attacks (WordNet, 10% of tokens) for both naive and Hi-DyPa schemes at L=8
 **Usage:**
 ```bat
 python evaluation_scripts/evaluate_synonym_attack.py ^
-  --scheme hierarchical ^
+  --scheme hi_dypa ^
   --group-bits 4 ^
   --user-bits 4 ^
   --l-bits 8 ^
@@ -832,7 +832,7 @@ python evaluation_scripts/evaluate_synonym_attack.py ^
 **Features:**
 - Tests 16 attack variants per prompt: 4 synonym ratios (0.05, 0.10, 0.15, 0.20) × 4 modes (start, middle, end, random)
 - Mirrors the robustness workflow but uses WordNet synonym substitution instead of deletion attacks
-- Evaluates naive plus all eight hierarchical splits (G=1,U=7 … G=8,U=0) automatically
+- Evaluates naive plus all eight hi_dypa splits (G=1,U=7 … G=8,U=0) automatically
 - Records per-attack variant: `synonym_ratio`, `synonym_mode`, recovered codeword, invalid symbols, Hamming distance, z-score, group/user matches
 - Computes the same aggregate metrics as robustness and saves all attack results to `raw_results.jsonl.gz` (if enabled) and per‑configuration `summary.json` / `summary.csv` under `evaluation/synonym_attack/<scheme_dir>`
   - `summary.json` contains both aggregate `metrics` and `metrics_by_variant` (metrics for each `(synonym_ratio, synonym_mode)` pair)
@@ -843,7 +843,7 @@ python evaluation_scripts/evaluate_synonym_attack.py ^
 **Usage:**
 ```bat
 python evaluation_scripts/evaluate_rewrite_attack.py ^
-  --scheme hierarchical ^
+  --scheme hi_dypa ^
   --group-bits 4 ^
   --user-bits 4 ^
   --l-bits 8 ^
@@ -863,7 +863,7 @@ python evaluation_scripts/evaluate_rewrite_attack.py ^
 - Tests 16 attack variants per prompt: 4 rewrite ratios (0.05, 0.10, 0.15, 0.20) × 4 modes (start, middle, end, random)
 - Mirrors the robustness workflow but uses LLM-based rewriting instead of deletion attacks
 - Uses `apply_llm_rewrite` to prompt the same LM to rewrite selected sentences deterministically (no sampling) before detection
-- Evaluates naive plus all hierarchical splits, mirroring other attack scripts
+- Evaluates naive plus all hi_dypa splits, mirroring other attack scripts
 - Records per-attack variant: `rewrite_ratio`, `rewrite_mode`, recovered codeword, invalid symbols, Hamming distance, z-score, group/user matches
 - Outputs all attack results to `raw_results.jsonl.gz` (if enabled) and per‑configuration `summary.json` / `summary.csv` under `evaluation/rewrite_attack/<scheme_dir>`
   - `summary.json` contains both aggregate `metrics` and `metrics_by_variant` (metrics for each `(rewrite_ratio, rewrite_mode)` pair)
@@ -929,11 +929,11 @@ python helper_scripts\download_models_hpc.py --model gpt-oss-20b --cache-dir /sh
 
 Convenience wrappers for running evaluation scripts locally (without SLURM). These scripts sequentially invoke the corresponding evaluation scripts for all configurations.
 
-#### `evaluation_scripts_local/run_hierarchical_detection_local.py`
-**Purpose:** Run all hierarchical detection configurations locally (naive + 8 hierarchical splits)
+#### `evaluation_scripts_local/run_hi_dypa_detection_local.py`
+**Purpose:** Run all hi_dypa detection configurations locally (naive + 8 hi_dypa splits)
 **Usage:**
 ```bat
-python evaluation_scripts_local\run_hierarchical_detection_local.py ^
+python evaluation_scripts_local\run_hi_dypa_detection_local.py ^
   --prompts-file assets/prompts.txt ^
   --num-prompts 300 ^
   --users-file assets/users.csv ^
@@ -943,20 +943,20 @@ python evaluation_scripts_local\run_hierarchical_detection_local.py ^
   --hashing-context 5 ^
   --z-threshold 4.0 ^
   --max-new-tokens 512 ^
-  --output-dir evaluation/hierarchical_detection
+  --output-dir evaluation/hi_dypa_detection
 ```
 
 **Features:**
-- Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits: G=1,U=7 through G=8,U=0)
-- Forwards shared arguments to `evaluate_hierarchical_detection.py`
+- Runs all 9 configurations sequentially (naive L=8 + 8 hi_dypa splits: G=1,U=7 through G=8,U=0)
+- Forwards shared arguments to `evaluate_hi_dypa_detection.py`
 - Generates consolidated summary CSV across all configurations
 - Designed for single workstation use (mirrors HPC SLURM script functionality)
 
-#### `evaluation_scripts_local/run_hierarchical_performance_local.py`
-**Purpose:** Run all hierarchical performance evaluations locally (memory, computation, storage metrics)
+#### `evaluation_scripts_local/run_hi_dypa_performance_local.py`
+**Purpose:** Run all hi_dypa performance evaluations locally (memory, computation, storage metrics)
 **Usage:**
 ```bat
-python evaluation_scripts_local\run_hierarchical_performance_local.py ^
+python evaluation_scripts_local\run_hi_dypa_performance_local.py ^
   --prompts-file assets/prompts.txt ^
   --num-prompts 100 ^
   --users-file assets/users.csv ^
@@ -971,16 +971,16 @@ python evaluation_scripts_local\run_hierarchical_performance_local.py ^
 ```
 
 **Features:**
-- Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits)
+- Runs all 9 configurations sequentially (naive L=8 + 8 hi_dypa splits)
 - Measures performance metrics: memory usage, computation time, storage size
 - Forwards shared arguments to `evaluate_multiuser_performance.py`
 - Generates consolidated performance summary
 
-#### `evaluation_scripts_local/run_hierarchical_robustness_local.py`
-**Purpose:** Run all hierarchical robustness evaluations locally (deletion attack resistance)
+#### `evaluation_scripts_local/run_hi_dypa_robustness_local.py`
+**Purpose:** Run all hi_dypa robustness evaluations locally (deletion attack resistance)
 **Usage:**
 ```bat
-python evaluation_scripts_local\run_hierarchical_robustness_local.py ^
+python evaluation_scripts_local\run_hi_dypa_robustness_local.py ^
   --prompts-file assets/prompts.txt ^
   --num-prompts 300 ^
   --users-file assets/users.csv ^
@@ -994,9 +994,9 @@ python evaluation_scripts_local\run_hierarchical_robustness_local.py ^
 ```
 
 **Features:**
-- Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits)
+- Runs all 9 configurations sequentially (naive L=8 + 8 hi_dypa splits)
 - Tests 16 deletion attack variants per prompt (4 deletion percents: 5%, 10%, 15%, 20% × 4 deletion modes: start, middle, end, random)
-- Forwards shared arguments to `evaluate_hierarchical_robustness.py`
+- Forwards shared arguments to `evaluate_hi_dypa_robustness.py`
 - Generates consolidated `evaluation/robustness/summary_all_configs.csv` across all configurations, with:
   - One row **per variant per configuration** (16 rows per config)
   - Variant columns (`deletion_percent`, `deletion_mode`) plus all robustness metrics
@@ -1020,7 +1020,7 @@ python evaluation_scripts_local\run_paraphrasing_attack_local.py ^
 ```
 
 **Features:**
-- Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits)
+- Runs all 9 configurations sequentially (naive L=8 + 8 hi_dypa splits)
 - Tests 16 paraphrasing attack variants per prompt (4 ratios: 5%, 10%, 15%, 20% × 4 modes: start, middle, end, random)
 - Forwards shared arguments to `evaluate_paraphrasing_attack.py`
 - Generates consolidated `evaluation/paraphrasing_attack/summary_all_configs.csv` across all configurations, with:
@@ -1046,7 +1046,7 @@ python evaluation_scripts_local\run_rewrite_attack_local.py ^
 ```
 
 **Features:**
-- Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits)
+- Runs all 9 configurations sequentially (naive L=8 + 8 hi_dypa splits)
 - Tests 16 rewrite attack variants per prompt (4 ratios: 5%, 10%, 15%, 20% × 4 modes: start, middle, end, random)
 - Forwards shared arguments to `evaluate_rewrite_attack.py`
 - Generates consolidated `evaluation/rewrite_attack/summary_all_configs.csv` across all configurations, with:
@@ -1072,7 +1072,7 @@ python evaluation_scripts_local\run_synonym_attack_local.py ^
 ```
 
 **Features:**
-- Runs all 9 configurations sequentially (naive L=8 + 8 hierarchical splits)
+- Runs all 9 configurations sequentially (naive L=8 + 8 hi_dypa splits)
 - Tests 16 synonym substitution attack variants per prompt (4 ratios: 5%, 10%, 15%, 20% × 4 modes: start, middle, end, random)
 - Forwards shared arguments to `evaluate_synonym_attack.py`
 - Generates consolidated `evaluation/synonym_attack/summary_all_configs.csv` across all configurations, with:
@@ -1088,8 +1088,8 @@ All scripts in `slurm_scripts/` are HPC cluster batch job scripts for running ev
 - `run_collusion_eval_hpc.sh`: Collusion resistance evaluation (300 prompts, 64-hour limit)
 - `run_multiuser_performance_eval_hpc.sh`: Multi-user performance evaluation
 - `run_lbit_sweep_hpc.sh`: L-bit parameter sweep
-- `run_hierarchical_detection_hpc.sh`: Hierarchical detection evaluation (300 prompts, 64-hour limit)
-- `run_hierarchical_robustness_hpc.sh`: Hierarchical robustness evaluation (300 prompts, 16 variants per prompt, 64-hour limit)
+- `run_hi_dypa_detection_hpc.sh`: Hi-DyPa detection evaluation (300 prompts, 64-hour limit)
+- `run_hi_dypa_robustness_hpc.sh`: Hi-DyPa robustness evaluation (300 prompts, 16 variants per prompt, 64-hour limit)
 - `run_paraphrasing_attack_hpc.sh`: Paraphrasing attack evaluation (300 prompts, 16 variants per prompt, 64-hour limit)
 - `run_rewrite_attack_hpc.sh`: Rewrite attack evaluation (300 prompts, 16 variants per prompt, 64-hour limit)
 - `run_synonym_attack_hpc.sh`: Synonym substitution attack evaluation (300 prompts, 16 variants per prompt, 64-hour limit)
@@ -1103,11 +1103,11 @@ All scripts in `slurm_scripts/` are HPC cluster batch job scripts for running ev
 
 **Usage:**
 ```bash
-# Run hierarchical detection evaluation (9 configurations, 300 prompts each)
-sbatch slurm_scripts/run_hierarchical_detection_hpc.sh
+# Run hi_dypa detection evaluation (9 configurations, 300 prompts each)
+sbatch slurm_scripts/run_hi_dypa_detection_hpc.sh
 
-# Run hierarchical robustness evaluation (9 configurations, 300 prompts, 16 variants each)
-sbatch slurm_scripts/run_hierarchical_robustness_hpc.sh
+# Run hi_dypa robustness evaluation (9 configurations, 300 prompts, 16 variants each)
+sbatch slurm_scripts/run_hi_dypa_robustness_hpc.sh
 
 # Run paraphrasing attack evaluation (9 configurations, 300 prompts, 16 variants each)
 sbatch slurm_scripts/run_paraphrasing_attack_hpc.sh
@@ -1340,11 +1340,11 @@ python -c "import nltk; nltk.download('punkt', download_dir='/shared/nltk_data')
 All SLURM scripts use **Apptainer** containers (no host Python/venv setup needed) and run on the **skylake-gpu** partition with **64-hour time limits**. Pick the SLURM wrapper that matches your evaluation:
 
 ```bash
-# Hierarchical detection evaluation (9 configurations, 300 prompts each)
-sbatch slurm_scripts/run_hierarchical_detection_hpc.sh
+# Hi-DyPa detection evaluation (9 configurations, 300 prompts each)
+sbatch slurm_scripts/run_hi_dypa_detection_hpc.sh
 
-# Hierarchical robustness evaluation (9 configurations, 300 prompts, 16 variants each)
-sbatch slurm_scripts/run_hierarchical_robustness_hpc.sh
+# Hi-DyPa robustness evaluation (9 configurations, 300 prompts, 16 variants each)
+sbatch slurm_scripts/run_hi_dypa_robustness_hpc.sh
 
 # Paraphrasing attack evaluation (9 configurations, 300 prompts, 16 variants each)
 sbatch slurm_scripts/run_paraphrasing_attack_hpc.sh
@@ -1624,15 +1624,15 @@ evaluation/collusion_resistance_<N>/
 
 ---
 
-### Hierarchical Detection Performance Evaluation
+### Hi-DyPa Detection Performance Evaluation
 
-Evaluate pure detection performance (no collusion) for hierarchical multi-user watermarking at L=8, across all allocations of group bits and user bits.
+Evaluate pure detection performance (no collusion) for hi_dypa multi-user watermarking at L=8, across all allocations of group bits and user bits.
 
 #### Run Evaluation
 
 **Naive scheme (L=8, no hierarchy):**
 ```bat
-python evaluation_scripts/evaluate_hierarchical_detection.py ^
+python evaluation_scripts/evaluate_hi_dypa_detection.py ^
   --scheme naive ^
   --l-bits 8 ^
   --prompts-file assets/prompts.txt ^
@@ -1644,13 +1644,13 @@ python evaluation_scripts/evaluate_hierarchical_detection.py ^
   --hashing-context 5 ^
   --z-threshold 4.0 ^
   --max-new-tokens 512 ^
-  --output-dir evaluation/hierarchical_detection
+  --output-dir evaluation/hi_dypa_detection
 ```
 
-**Hierarchical scheme (G=4, U=4):**
+**Hi-DyPa scheme (G=4, U=4):**
 ```bat
-python evaluation_scripts/evaluate_hierarchical_detection.py ^
-  --scheme hierarchical ^
+python evaluation_scripts/evaluate_hi_dypa_detection.py ^
+  --scheme hi_dypa ^
   --group-bits 4 ^
   --user-bits 4 ^
   --l-bits 8 ^
@@ -1663,51 +1663,51 @@ python evaluation_scripts/evaluate_hierarchical_detection.py ^
   --hashing-context 5 ^
   --z-threshold 4.0 ^
   --max-new-tokens 512 ^
-  --output-dir evaluation/hierarchical_detection
+  --output-dir evaluation/hi_dypa_detection
 ```
 
 **What it does:**
 1. Evaluates 9 configurations:
    - **Naive**: L=8, no hierarchy, every user gets a flat L-bit codeword
-   - **Hierarchical G=1, U=7**: 1 group, 128 users per group
-   - **Hierarchical G=2, U=6**: 2 groups, 64 users per group
-   - **Hierarchical G=3, U=5**: 4 groups, 32 users per group
-   - **Hierarchical G=4, U=4**: 8 groups, 16 users per group
-   - **Hierarchical G=5, U=3**: 16 groups, 8 users per group
-   - **Hierarchical G=6, U=2**: 32 groups, 4 users per group
-   - **Hierarchical G=7, U=1**: 64 groups, 2 users per group
-   - **Hierarchical G=8, U=0**: 128 groups, 1 user per group (group-only mode)
+   - **Hi-DyPa G=1, U=7**: 1 group, 128 users per group
+   - **Hi-DyPa G=2, U=6**: 2 groups, 64 users per group
+   - **Hi-DyPa G=3, U=5**: 4 groups, 32 users per group
+   - **Hi-DyPa G=4, U=4**: 8 groups, 16 users per group
+   - **Hi-DyPa G=5, U=3**: 16 groups, 8 users per group
+   - **Hi-DyPa G=6, U=2**: 32 groups, 4 users per group
+   - **Hi-DyPa G=7, U=1**: 64 groups, 2 users per group
+   - **Hi-DyPa G=8, U=0**: 128 groups, 1 user per group (group-only mode)
 2. For each prompt:
    - Chooses a random user ID
    - Embeds watermark
    - Detects L-bit codeword
-   - Decodes group ID and user ID (for hierarchical)
+   - Decodes group ID and user ID (for hi_dypa)
    - Logs: true/detected IDs, codewords, Hamming distance, z-scores, match statuses
 3. Computes metrics:
    - **For naive**: L-bit accuracy, full identity accuracy, false positive/negative rates
-   - **For hierarchical**: group accuracy, user accuracy (given correct group), full identity accuracy, L-bit accuracy, false positive/negative rates
+   - **For hi_dypa**: group accuracy, user accuracy (given correct group), full identity accuracy, L-bit accuracy, false positive/negative rates
 
 **Output structure:**
 ```
-evaluation/hierarchical_detection/
+evaluation/hi_dypa_detection/
 ├── naive_L8/
 │   ├── prompt_0.json
 │   ├── prompt_1.json
 │   ├── ...
 │   └── summary.json
-├── hierarchical_G1_U7/
+├── hi_dypa_G1_U7/
 │   ├── prompt_0.json
 │   ├── prompt_1.json
 │   ├── ...
 │   └── summary.json
-├── hierarchical_G2_U6/
+├── hi_dypa_G2_U6/
 │   └── ...
 └── ... (other configurations)
 ```
 
 **Per-prompt JSON contains:**
 - `true_user_id`, `detected_user_id`
-- `true_group_id`, `detected_group_id` (for hierarchical)
+- `true_group_id`, `detected_group_id` (for hi_dypa)
 - `recovered_codeword`, `ground_truth_codeword`
 - `num_invalid_symbols`, `hamming_distance`, `z_score`
 - `group_match`, `user_match`, `full_identity_match`, `lbit_accuracy`
@@ -1720,20 +1720,20 @@ evaluation/hierarchical_detection/
 **HPC Usage:**
 Run all 8 configurations on HPC:
 ```bash
-sbatch slurm_scripts/run_hierarchical_detection_hpc.sh
+sbatch slurm_scripts/run_hi_dypa_detection_hpc.sh
 ```
 
 ---
 
-### Hierarchical Robustness Evaluation
+### Hi-DyPa Robustness Evaluation
 
-Evaluate robustness to deletion attacks for hierarchical multi-user watermarking at L=8, across all allocations of group bits and user bits.
+Evaluate robustness to deletion attacks for hi_dypa multi-user watermarking at L=8, across all allocations of group bits and user bits.
 
 #### Run Evaluation
 
 **Naive scheme (L=8, no hierarchy):**
 ```bat
-python evaluation_scripts/evaluate_hierarchical_robustness.py ^
+python evaluation_scripts/evaluate_hi_dypa_robustness.py ^
   --scheme naive ^
   --l-bits 8 ^
   --prompts-file assets/prompts.txt ^
@@ -1748,10 +1748,10 @@ python evaluation_scripts/evaluate_hierarchical_robustness.py ^
   --output-dir evaluation/robustness
 ```
 
-**Hierarchical scheme (G=4, U=4):**
+**Hi-DyPa scheme (G=4, U=4):**
 ```bat
-python evaluation_scripts/evaluate_hierarchical_robustness.py ^
-  --scheme hierarchical ^
+python evaluation_scripts/evaluate_hi_dypa_robustness.py ^
+  --scheme hi_dypa ^
   --group-bits 4 ^
   --user-bits 4 ^
   --l-bits 8 ^
@@ -1768,7 +1768,7 @@ python evaluation_scripts/evaluate_hierarchical_robustness.py ^
 ```
 
 **What it does:**
-1. Same as hierarchical detection evaluation, but applies deletion attacks before detection
+1. Same as hi_dypa detection evaluation, but applies deletion attacks before detection
 2. For each prompt:
    - Generates watermarked text (same as detection evaluation)
    - Applies 16 deletion attack variants:
@@ -1782,7 +1782,7 @@ python evaluation_scripts/evaluate_hierarchical_robustness.py ^
    - **random**: Remove k randomly sampled tokens
 4. Computes metrics:
    - **For naive**: Full identity accuracy, false positive/negative rates, average invalid symbols, average Hamming distance, average z-score
-   - **For hierarchical**: Group accuracy, user accuracy, full identity accuracy, false positive/negative rates, average invalid symbols, average Hamming distance, average z-score
+   - **For hi_dypa**: Group accuracy, user accuracy, full identity accuracy, false positive/negative rates, average invalid symbols, average Hamming distance, average z-score
 
 **Output structure:**
 ```
@@ -1790,7 +1790,7 @@ evaluation/robustness/
 ├── naive/naive_L8/
 │   ├── results.json          # All attack results (one entry per attack variant)
 │   └── summary.json          # Summary metrics
-├── hierarchical/G4_U4/
+├── hi_dypa/G4_U4/
 │   ├── results.json          # All attack results (one entry per attack variant)
 │   └── summary.json          # Summary metrics
 └── ... (other configurations)
@@ -1801,7 +1801,7 @@ evaluation/robustness/
 - `deletion_percent`, `deletion_mode`
 - `recovered_codeword`, `ground_truth_codeword`
 - `num_invalid_symbols`, `hamming_distance`, `z_score`
-- `detected_user_id`, `detected_group_id` (for hierarchical)
+- `detected_user_id`, `detected_group_id` (for hi_dypa)
 - `group_match`, `user_match`, `full_identity_match`
 
 **Summary JSON contains:**
@@ -1811,9 +1811,9 @@ evaluation/robustness/
 - Computed metrics (accuracy rates, false positive/negative rates, averages)
 
 **HPC Usage:**
-Run all 9 configurations (naive + 8 hierarchical variants) on HPC:
+Run all 9 configurations (naive + 8 hi_dypa variants) on HPC:
 ```bash
-sbatch slurm_scripts/run_hierarchical_robustness_hpc.sh
+sbatch slurm_scripts/run_hi_dypa_robustness_hpc.sh
 ```
 
 **Note:** This evaluation takes significantly longer than detection evaluation (~16× longer) since each prompt generates 16 attack variants instead of 1 clean result.

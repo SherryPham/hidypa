@@ -5,11 +5,11 @@
 # Format: config_name: seed_value
 
 naive_L8: 1000478847
-hierarchical_G1_U7: 1026621429
-hierarchical_G2_U6: 1061249670
-hierarchical_G3_U5: 1088080357
-hierarchical_G4_U4: 1116154790
-hierarchical_G5_U3: 1149153022
-hierarchical_G6_U2: 1181888623
-hierarchical_G7_U1: 1208659045
-hierarchical_G8_U0: 96373875
+hi_dypa_G1_U7: 1026621429
+hi_dypa_G2_U6: 1061249670
+hi_dypa_G3_U5: 1088080357
+hi_dypa_G4_U4: 1116154790
+hi_dypa_G5_U3: 1149153022
+hi_dypa_G6_U2: 1181888623
+hi_dypa_G7_U1: 1208659045
+hi_dypa_G8_U0: 96373875

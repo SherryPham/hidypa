@@ -1,5 +1,5 @@
 # compare_collusion_resistance.py
-# Script to evaluate naive and hierarchical watermarking schemes under controlled collusion
+# Script to evaluate naive and hi_dypa watermarking schemes under controlled collusion
 # Tests with 2-3 colluders in different configurations: same group, cross group, mixed
 
 import argparse
@@ -25,7 +25,7 @@ from src.watermark import (
     ZeroBitWatermarker, 
     LBitWatermarker, 
     NaiveMultiUserWatermarker, 
-    HierarchicalMultiUserWatermarker
+    HiDyPaMultiUserWatermarker
 )
 from src.utils import get_model, parse_final_output
 
@@ -85,7 +85,7 @@ def merge_codewords_bitwise_majority(codewords: list[str]) -> str:
 
 def sample_same_group(muw, k: int) -> list[int]:
     """
-    Sample k users from the same group (for hierarchical scheme).
+    Sample k users from the same group (for Hi-DyPa scheme).
     For naive scheme, just sample k random users.
     
     Args:
@@ -99,7 +99,7 @@ def sample_same_group(muw, k: int) -> list[int]:
         # Naive scheme: all users are independent
         return sorted(random.sample(range(muw.N), k))
     
-    # Hierarchical scheme: pick a random group and sample k users from it
+    # Hi-DyPa scheme: pick a random group and sample k users from it
     # Get all groups and their users
     group_to_users = {}
     for user_id, group_id in muw.user_to_group.items():
@@ -123,7 +123,7 @@ def sample_same_group(muw, k: int) -> list[int]:
 
 def sample_different_groups(muw, k: int) -> list[int]:
     """
-    Sample k users from k different groups (for hierarchical scheme).
+    Sample k users from k different groups (for Hi-DyPa scheme).
     For naive scheme, just sample k random users (since all are independent).
     
     Args:
@@ -137,7 +137,7 @@ def sample_different_groups(muw, k: int) -> list[int]:
         # Naive scheme: all users are independent
         return sorted(random.sample(range(muw.N), k))
     
-    # Hierarchical scheme: pick k different groups
+    # Hi-DyPa scheme: pick k different groups
     # Get all groups
     group_to_users = {}
     for user_id, group_id in muw.user_to_group.items():
@@ -177,7 +177,7 @@ def sample_2_same_1_diff(muw) -> list[int]:
         # Naive scheme: all users are independent
         return sorted(random.sample(range(muw.N), 3))
     
-    # Hierarchical scheme: pick 2 from one group, 1 from another
+    # Hi-DyPa scheme: pick 2 from one group, 1 from another
     # Get all groups
     group_to_users = {}
     for user_id, group_id in muw.user_to_group.items():
@@ -228,7 +228,7 @@ def get_group_info(muw) -> dict:
             'can_run_mixed': True
         }
     
-    # Hierarchical scheme: analyze groups
+    # Hi-DyPa scheme: analyze groups
     group_to_users = {}
     for user_id, group_id in muw.user_to_group.items():
         if group_id not in group_to_users:
@@ -268,7 +268,7 @@ def save_raw_results(records: list[dict], output_path: str):
 def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_ids: list[int]) -> dict:
     """
     Try to trace back to original colluding users using the merged codeword.
-    For hierarchical schemes, uses the built-in trace_from_codeword method which
+    For Hi-DyPa schemes, uses the built-in trace_from_codeword method which
     first identifies suspect groups, then searches only within those groups.
     For naive schemes, uses direct codeword matching with Hamming distance.
     Checks ALL users to properly detect false positives (innocent users incorrectly accused).
@@ -283,11 +283,11 @@ def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_
         Dictionary with tracing results including success status
     """
     try:
-        # For hierarchical schemes, use the built-in trace_from_codeword method
+        # For Hi-DyPa schemes, use the built-in trace_from_codeword method
         # This is more efficient and accurate as it first identifies suspect groups
         if hasattr(muw, 'trace_from_codeword') and hasattr(muw, 'group_codewords') and muw.group_codewords:
             try:
-                # Use hierarchical tracing: identifies suspect groups first, then searches within them
+                # Use hi_dypa tracing: identifies suspect groups first, then searches within them
                 accused_users = muw.trace_from_codeword(merged_codeword)
                 matches = [u['user_id'] for u in accused_users]
                 
@@ -318,13 +318,13 @@ def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_
                     'num_matches': len(matches),
                     'merged_codeword': merged_codeword,
                     'hamming_distances': hamming_distances,
-                    'method': 'hierarchical_trace'
+                    'method': 'hi_dypa_trace'
                 }
             except Exception as e:
-                # If hierarchical tracing fails, fall back to direct matching
+                # If hi_dypa tracing fails, fall back to direct matching
                 pass
         
-        # For naive schemes (or if hierarchical tracing fails), use direct codeword matching
+        # For naive schemes (or if hi_dypa tracing fails), use direct codeword matching
         matches = []
         hamming_distances = {}
         
@@ -440,27 +440,27 @@ def evaluate_collusion_case(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Evaluate naive and hierarchical watermarking schemes under controlled collusion",
+        description="Evaluate naive and hi_dypa watermarking schemes under controlled collusion",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
         '--scheme',
         type=str,
         required=True,
-        choices=['naive', 'hierarchical'],
-        help='Watermarking scheme to use: naive or hierarchical'
+        choices=['naive', 'hi_dypa'],
+        help='Watermarking scheme to use: naive or hi_dypa'
     )
     parser.add_argument(
         '--group-bits',
         type=int,
         default=None,
-        help='Number of bits for group codewords (required for hierarchical scheme)'
+        help='Number of bits for group codewords (required for Hi-DyPa scheme)'
     )
     parser.add_argument(
         '--user-bits',
         type=int,
         default=None,
-        help='Number of bits for user fingerprints (required for hierarchical scheme)'
+        help='Number of bits for user fingerprints (required for Hi-DyPa scheme)'
     )
     parser.add_argument(
         '--l-bits',
@@ -562,9 +562,9 @@ def main():
     args = parser.parse_args()
     
     # Validate arguments
-    if args.scheme == 'hierarchical':
+    if args.scheme == 'hi_dypa':
         if args.group_bits is None or args.user_bits is None:
-            parser.error("--group-bits and --user-bits are required for hierarchical scheme")
+            parser.error("--group-bits and --user-bits are required for Hi-DyPa scheme")
         if args.group_bits + args.user_bits != args.l_bits:
             parser.error(
                 f"--group-bits ({args.group_bits}) + --user-bits ({args.user_bits}) "
@@ -572,8 +572,8 @@ def main():
             )
     
     # Create output directory structure
-    if args.scheme == 'hierarchical':
-        scheme_dir_parts = ['hierarchical', f"G{args.group_bits}_U{args.user_bits}"]
+    if args.scheme == 'hi_dypa':
+        scheme_dir_parts = ['hi_dypa', f"G{args.group_bits}_U{args.user_bits}"]
     else:
         scheme_dir_parts = ['naive', f"L{args.l_bits}"]
     
@@ -601,8 +601,8 @@ def main():
             
             if os.path.exists(seeds_file_path):
                 # Generate config name to check
-                if args.scheme == 'hierarchical':
-                    config_name = f"hierarchical_G{args.group_bits}_U{args.user_bits}"
+                if args.scheme == 'hi_dypa':
+                    config_name = f"hi_dypa_G{args.group_bits}_U{args.user_bits}"
                 else:
                     config_name = f"naive_L{args.l_bits}"
                 
@@ -624,8 +624,8 @@ def main():
     np.random.seed(seed)
     
     # Generate config name for seeds.txt
-    if args.scheme == 'hierarchical':
-        config_name = f"hierarchical_G{args.group_bits}_U{args.user_bits}"
+    if args.scheme == 'hi_dypa':
+        config_name = f"hi_dypa_G{args.group_bits}_U{args.user_bits}"
     else:
         config_name = f"naive_L{args.l_bits}"
     
@@ -668,7 +668,7 @@ def main():
     print("="*80)
     print(f"\nConfiguration:")
     print(f"  • Scheme: {args.scheme}")
-    if args.scheme == 'hierarchical':
+    if args.scheme == 'hi_dypa':
         print(f"  • Group bits: {args.group_bits}")
         print(f"  • User bits: {args.user_bits}")
     print(f"  • L-bits: {args.l_bits}")
@@ -713,8 +713,8 @@ def main():
     )
     lbit_watermarker = LBitWatermarker(zero_bit_watermarker=zero_bit, L=args.l_bits)
     
-    if args.scheme == 'hierarchical':
-        muw = HierarchicalMultiUserWatermarker(
+    if args.scheme == 'hi_dypa':
+        muw = HiDyPaMultiUserWatermarker(
             lbit_watermarker=lbit_watermarker,
             group_bits=args.group_bits,
             user_bits=args.user_bits,
@@ -729,7 +729,7 @@ def main():
         print(f"  Error: Users file not found: {users_path}")
         return
     
-    # For naive scheme, ensure exactly 128 users for fair comparison with hierarchical
+    # For naive scheme, ensure exactly 128 users for fair comparison with hi_dypa
     if args.scheme == 'naive':
         import tempfile
         df_all = pd.read_csv(users_path)
@@ -752,7 +752,7 @@ def main():
     group_info = get_group_info(muw)
     
     # Log warnings once at the start if cases need to be skipped
-    if args.scheme == 'hierarchical':
+    if args.scheme == 'hi_dypa':
         print(f"\n  Group structure: {group_info['num_groups']} groups available")
         skipped_cases = []
         if not group_info['can_run_cross_group_2']:
@@ -782,8 +782,8 @@ def main():
             'scheme': args.scheme,
             'config': {
                 'l_bits': args.l_bits,
-                'group_bits': args.group_bits if args.scheme == 'hierarchical' else None,
-                'user_bits': args.user_bits if args.scheme == 'hierarchical' else None,
+                'group_bits': args.group_bits if args.scheme == 'hi_dypa' else None,
+                'user_bits': args.user_bits if args.scheme == 'hi_dypa' else None,
             },
             'results': {}
         }
@@ -953,8 +953,8 @@ def main():
         'model': args.model,
         'run_tag': args.run_tag,
         'l_bits': args.l_bits,
-        'group_bits': args.group_bits if args.scheme == 'hierarchical' else None,
-        'user_bits': args.user_bits if args.scheme == 'hierarchical' else None,
+        'group_bits': args.group_bits if args.scheme == 'hi_dypa' else None,
+        'user_bits': args.user_bits if args.scheme == 'hi_dypa' else None,
         'num_prompts': len(all_results),
         'random_seed': seed,
         'output_directory': scheme_output_dir,

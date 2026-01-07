@@ -63,7 +63,7 @@ run_py evaluation_scripts/evaluate_multiuser_performance.py \
     --output-dir evaluation/multiuser_performance/naive/L8 \
     --unified-summary-path "${UNIFIED_SUMMARY}"
 
-# Step 2: Run all hierarchical configs (hierarchical-only)
+# Step 2: Run all Hi-DyPa configs (hi_dypa-only)
 GU_CONFIGS=(
     "1 7"
     "2 6"
@@ -79,7 +79,7 @@ for config in "${GU_CONFIGS[@]}"; do
     read -r group_bits user_bits <<< "$config"
     echo ""
     echo "=========================================="
-    echo "Running Hierarchical G=${group_bits}, U=${user_bits}"
+    echo "Running Hi-DyPa G=${group_bits}, U=${user_bits}"
     echo "=========================================="
     
     run_py evaluation_scripts/evaluate_multiuser_performance.py \
@@ -97,8 +97,8 @@ for config in "${GU_CONFIGS[@]}"; do
         --max-prompts 300 \
         --user-start 1 \
         --user-end 10 \
-        --hierarchical-only \
-        --output-dir "evaluation/multiuser_performance/hierarchical/G${group_bits}_U${user_bits}" \
+        --hi_dypa-only \
+        --output-dir "evaluation/multiuser_performance/hi_dypa/G${group_bits}_U${user_bits}" \
         --unified-summary-path "${UNIFIED_SUMMARY}"
 done
 
