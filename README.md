@@ -104,10 +104,7 @@ Cryptographic-Watermarking-for-LLM/
 │   ├── evaluate_synonym_attack.py  # Robustness to synonym substitution attacks
 │   ├── evaluate_rewrite_attack.py  # Robustness to LLM rewrite attacks
 │   ├── run_lbit_sweep.py            # L-bit parameter sweep
-│   ├── run_lbit_parameter_sweep.py  # L-bit parameter sweep (alternative)
-│   ├── run_detection_only.py        # Standalone detection script
-│   ├── redo_paraphrase_attack.py    # Re-run perturbation attacks
-│   └── test_undetectability.py      # Statistical undetectability tests
+│   └── run_lbit_parameter_sweep.py  # L-bit parameter sweep (alternative)
 │
 ├── evaluation_scripts_local/        # Local convenience wrappers for evaluation scripts
 │   ├── run_hierarchical_detection_local.py  # Run hierarchical detection evaluation locally
@@ -124,8 +121,9 @@ Cryptographic-Watermarking-for-LLM/
 │   ├── compute_code_capacity.py     # Compute code capacity for fingerprinting
 │   ├── visualise_blocks.py          # Visualize watermark blocks
 │   ├── visualise_lbit_blocks.py     # Visualize L-bit blocks
-│   ├── visualize_groups.py         # Visualize multi-user groups
+│   ├── visualize_groups.py          # Visualize multi-user groups
 │   ├── create_collusion_scenario.py # Create collusion test scenarios
+│   ├── download_flan_prompts.py     # Download FLAN prompts for evaluation
 │   └── download_models_hpc.py       # Pre-download models for HPC
 │
 ├── slurm_scripts/                   # HPC cluster batch job scripts
@@ -135,28 +133,52 @@ Cryptographic-Watermarking-for-LLM/
 │   ├── run_hierarchical_detection_hpc.sh  # Hierarchical detection evaluation
 │   ├── run_hierarchical_robustness_hpc.sh  # Hierarchical robustness evaluation
 │   ├── run_paraphrasing_attack_hpc.sh  # Paraphrasing attack evaluation (T5-small)
-│   ├── run_synonym_attack_hpc.sh  # Synonym substitution attack evaluation
-│   └── run_rewrite_attack_hpc.sh  # Rewrite attack evaluation
+│   ├── run_synonym_attack_hpc.sh    # Synonym substitution attack evaluation
+│   └── run_rewrite_attack_hpc.sh    # Rewrite attack evaluation
 │
 ├── assets/                          # Data files
 │   ├── users.csv                    # 1000 users (UserIds 0-999)
 │   └── prompts.txt                  # Evaluation prompts (typically 300+)
 │
-├── evaluation/                      # Evaluation results (auto-created)
-│   ├── evaluation_results/          # Main evaluation outputs
-│   ├── evaluation_results_lbit/      # L-bit evaluation results
-│   ├── lbit_sweep/                  # L-bit parameter sweep results
-│   ├── collusion_resistance_2_colluders/  # Collusion resistance evaluation (2 colluders)
-│   ├── local_multiuser_perf_user500/  # Multi-user performance evaluation results
-│   ├── hierarchical_detection/     # Hierarchical detection evaluation results
-│   └── robustness/                 # Hierarchical robustness evaluation results
+├── evaluation/                      # Evaluation results (auto-created by HPC jobs)
+│   ├── hierarchical_detection/      # Detection performance results
+│   │   ├── naive/L8/job_*/          # Naive L=8 results
+│   │   ├── hierarchical/G*_U*/job_*/ # Hierarchical results per config
+│   │   ├── seeds.txt                # Random seeds used
+│   │   └── summary_all_configs.csv  # Aggregated summary across all configs
+│   ├── robustness/                  # Deletion attack robustness results
+│   │   ├── naive/L8/job_*/          # Naive L=8 results
+│   │   ├── hierarchical/G*_U*/job_*/ # Hierarchical results per config
+│   │   ├── seeds.txt
+│   │   ├── summary_all_configs.csv
+│   │   └── summary_all_configs_concise.csv
+│   ├── paraphrasing_attack/         # T5-small paraphrasing attack results
+│   │   ├── naive/L8/job_*/
+│   │   ├── hierarchical/G*_U*/job_*/
+│   │   ├── seeds.txt
+│   │   ├── summary_all_configs.csv
+│   │   └── summary_all_configs_concise.csv
+│   ├── synonym_attack/              # WordNet synonym substitution attack results
+│   │   ├── naive/L8/job_*/
+│   │   ├── hierarchical/G*_U*/job_*/
+│   │   ├── seeds.txt
+│   │   ├── summary_all_configs.csv
+│   │   └── summary_all_configs_concise.csv
+│   └── rewrite_attack/              # LLM rewrite attack results
+│       ├── naive/L8/job_*/
+│       ├── hierarchical/G*_U*/job_*/
+│       ├── seeds.txt
+│       ├── summary_all_configs.csv
+│       └── summary_all_configs_concise.csv
+│
+├── evaluation_2_backup/             # Backup of multiuser performance results
+│   └── multiuser_performance/
+│       ├── naive/L8/
+│       ├── hierarchical/G*_U*/
+│       └── performance_summary.csv
 │
 └── demonstration/                   # Example outputs
-    ├── multiuser_user0.txt          # Multi-user example (user 0)
-    ├── hierarchical_user0.txt      # Hierarchical scheme example (user 0)
-    ├── hierarchical_user30.txt     # Hierarchical scheme example (user 30)
-    ├── hierarchical_user100.txt    # Hierarchical scheme example (user 100)
-    └── hierarchical_user239.txt    # Hierarchical scheme example (user 239)
+    └── hierarchical_user0.txt       # Hierarchical scheme example (user 0)
 ```
 
 ---
@@ -887,14 +909,14 @@ python helper_scripts\visualise_lbit_blocks.py output_lbit.txt --key-file secret
 
 **Output:** Shows which bit is embedded at each block position
 
-#### `evaluation_scripts/test_undetectability.py`
-**Purpose:** Statistical tests for undetectability
+#### `helper_scripts/download_flan_prompts.py`
+**Purpose:** Download FLAN prompts for evaluation
 **Usage:**
 ```bat
-python evaluation_scripts\test_undetectability.py --model gpt2 --num-samples 100
+python helper_scripts\download_flan_prompts.py --output-file assets/prompts.txt --num-prompts 300
 ```
 
-**Output:** Chi-square test results, KL divergence metrics
+**Output:** Text file with one prompt per line
 
 #### `helper_scripts/download_models_hpc.py`
 **Purpose:** Pre-cache models for offline HPC environments
