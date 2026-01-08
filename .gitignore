@@ -22,3 +22,4 @@ config/paths.py
 # =============================================================================
 evaluation/
 evaluation_2_backup/
+COMMANDS.md
