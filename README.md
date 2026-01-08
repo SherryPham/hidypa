@@ -779,18 +779,29 @@ python helper_scripts\analyse.py evaluation/evaluation_results --z-threshold 4.0
 
 **Summary statistics:**
 ```
-=== Evaluation Summary ===
-Total prompts: 75
-Clean text detection rate: 98.7%
-Average z-score (clean): 15.23
-False positive rate: 0.0%
+=== Hi-DyPa Detection Evaluation Summary ===
+Total prompts: 300
+Model: GPT-2
+L-bits: 8
 
-Robustness (perturbed text):
-  Delete start 20%: 87.3% detected
-  Delete end 20%: 89.1% detected
-  Delete middle 20%: 85.7% detected
-  Paraphrase 30%: 76.4% detected
+Configuration Results (Full Identity Accuracy):
+  Naive (L=8):           90.0%
+  Hi-DyPa G=1, U=7:      89.3%
+  Hi-DyPa G=2, U=6:      88.3%
+  Hi-DyPa G=3, U=5:      89.7%
+  Hi-DyPa G=4, U=4:      91.0%  (best)
+  Hi-DyPa G=5, U=3:      89.7%
+  Hi-DyPa G=6, U=2:      91.3%
+  Hi-DyPa G=7, U=1:      88.0%
+
+Robustness to Deletion Attacks (Hi-DyPa G=4, U=4):
+  5% deletion:   ~89% identity accuracy
+  10% deletion:  ~88% identity accuracy
+  15% deletion:  ~87% identity accuracy
+  20% deletion:  ~86% identity accuracy
 ```
+
+View all evaluation results in the `evaluation/` folder.
 
 ---
 
@@ -1499,29 +1510,29 @@ Decision: Text traced to User 888 ✓
 
 ### Evaluation Summary
 
-After running batch evaluation:
+After running Hi-DyPa evaluation (300 prompts, L=8):
 ```
-=== Evaluation Summary ===
-Total prompts tested: 100 (subset of ~300 available prompts)
-Model: gpt2
-Parameter sweep: delta=[2.0, 2.5, 3.0], entropy=[3.0, 3.5, 4.0]
+=== Hi-DyPa Multi-User Evaluation Summary ===
+Total prompts: 300
+Model: GPT-2
+Parameters: delta=3.5, entropy_threshold=2.5, z_threshold=4.0
 
-Clean text results:
-  Detection rate: 98.7% (97/100 prompts)
-  Average z-score: 15.23
-  Average blocks: 94.5
-  False positive rate: 0.0% (0/100 control texts)
+Detection Performance (no attacks):
+  Naive (L=8):       90.0% full identity accuracy
+  Hi-DyPa G=4,U=4:   91.0% full identity accuracy
+  Hi-DyPa G=6,U=2:   91.3% full identity accuracy
 
-Perturbation robustness:
-  Delete start 20%: 87.3% (87/100)
-  Delete end 20%: 89.1% (89/100)
-  Delete middle 20%: 85.7% (86/100)
-  Paraphrase 30%: 76.4% (76/100)
+Robustness to Deletion Attacks (best performing: start/end modes):
+  5% deletion:   87-92% identity accuracy
+  10% deletion:  85-90% identity accuracy
+  15% deletion:  83-88% identity accuracy
+  20% deletion:  80-86% identity accuracy
 
-Best parameter combination:
-  delta=2.5, entropy_threshold=3.5
-  Clean detection: 100%, Avg robustness: 86.2%
+Note: Random deletion mode significantly reduces accuracy.
+Best configuration: Hi-DyPa with G=4,U=4 or G=6,U=2
 ```
+
+View all evaluation results in the `evaluation/` folder.
 
 ---
 
@@ -2092,21 +2103,6 @@ for match in matches:
 
 ---
 
-## Performance Benchmarks
-
-Approximate generation speeds (256 tokens):
-
-| Model | Hardware | Speed | VRAM | Time (256 tokens) |
-|-------|----------|-------|------|-------------------|
-| GPT-2 | CPU (8 cores) | ~10 tok/s | ~1GB RAM | ~25 seconds |
-| GPT-2 | GPU (RTX 3090) | ~50 tok/s | ~1.5GB | ~5 seconds |
-| GPT-OSS-20B | A100 40GB | ~3 tok/s | ~18GB | ~85 seconds |
-| GPT-OSS-120B | A100 80GB | ~1 tok/s | ~75GB | ~4 minutes |
-
-Detection is typically 2-3x faster than generation.
-
----
-
 ## License and Citation
 
 ### License
@@ -2118,7 +2114,7 @@ Detection is typically 2-3x faster than generation.
 If you use this codebase in your research, please cite:
 
 ```bibtex
-@software{cryptographic_watermarking_llm,
+@software{hidypa,
   title={Hi-DyPa: Practical Multi-User Watermarking for Detection and Tracing in LLM System},
   year={2025}
 }
@@ -2139,7 +2135,13 @@ For issues and feature requests, please refer to the anonymous repository.
 
 ## Acknowledgments
 
-This implementation builds upon research in statistical watermarking and cryptographic fingerprinting for LLMs. Special thanks to:
+This implementation builds upon the theoretical framework presented in:
+
+> **Cohen, A., Hoover, A., & Schoenbach, G.** (2024). *Watermarking Language Models for Many Adaptive Users*. arXiv preprint.
+
+We gratefully acknowledge their foundational work on multi-user watermarking schemes, which inspired and informed the development of Hi-DyPa.
+
+Additional thanks to:
 - HuggingFace Transformers team
 - PyTorch contributors
 - Research community in AI safety and provenance
