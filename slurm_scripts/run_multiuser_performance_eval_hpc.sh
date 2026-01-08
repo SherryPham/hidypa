@@ -5,8 +5,8 @@
 # NOTE: Update account and partition for your HPC environment
 # =============================================================================
 #SBATCH --job-name=multiuser_perf_eval
-#SBATCH --account=YOUR_ACCOUNT
-#SBATCH -p YOUR_PARTITION
+#SBATCH --account=oz411
+#SBATCH -p skylake-gpu
 #SBATCH --gres=gpu:1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
