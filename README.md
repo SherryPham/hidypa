@@ -31,7 +31,7 @@ This repository implements the following watermarking schemes:
    - BCH-based scheme from Cohen et al. with guaranteed minimum Hamming distance
    - Groups users and assigns group codewords with error-correcting properties
    - Improved collusion resistance compared to naive scheme
-   - Supports minimum Hamming distances of 2, 3, or 4
+   - Uses BCH even-parity construction with minimum Hamming distance of 2
 
 5. **Hi-DyPa Multi-User Watermarking** (`HiDyPaMultiUserWatermarker`)
    - **Our proposed hierarchical scheme** that extends the baseline framework
@@ -94,7 +94,7 @@ This repository implements cryptographic watermarking techniques for LLM text ge
   4. Simple but vulnerable to collusion attacks
 
 - **Grouped Scheme (BCH-Based):**
-  1. Generate BCH codewords with guaranteed minimum Hamming distance (2, 3, or 4)
+  1. Generate BCH codewords with guaranteed minimum Hamming distance of 2 (even-parity construction)
   2. Assign users to groups sequentially (all users in a group share the same group codeword)
   3. Embed the user's group codeword using L-bit watermarking
   4. During tracing, match recovered codeword to group(s) and identify accused users
@@ -167,14 +167,16 @@ Cryptographic-Watermarking-for-LLM/
 │
 ├── helper_scripts/                  # Analysis and utility scripts
 │   ├── analyse.py                   # Generate plots from evaluation results
-│   ├── generate_users.py            # Create user database CSV
+│   ├── anonymize_evaluation_paths.py # Anonymize paths in evaluation results
 │   ├── compute_code_capacity.py     # Compute code capacity for fingerprinting
-│   ├── visualise_blocks.py          # Visualize watermark blocks
-│   ├── visualise_lbit_blocks.py     # Visualize L-bit blocks
-│   ├── visualize_groups.py          # Visualize multi-user groups
 │   ├── create_collusion_scenario.py # Create collusion test scenarios
 │   ├── download_flan_prompts.py     # Download FLAN prompts for evaluation
-│   └── download_models_hpc.py       # Pre-download models for HPC
+│   ├── download_models_hpc.py       # Pre-download models for HPC
+│   ├── generate_users.py            # Create user database CSV
+│   ├── rename_hierarchical_to_hidypa.py # Rename hierarchical to hi_dypa naming
+│   ├── visualise_blocks.py          # Visualize watermark blocks
+│   ├── visualise_lbit_blocks.py     # Visualize L-bit blocks
+│   └── visualize_groups.py          # Visualize multi-user groups
 │
 ├── slurm_scripts/                   # HPC cluster batch job scripts
 │   ├── run_collusion_eval_hpc.sh    # Collusion resistance evaluation
@@ -270,6 +272,10 @@ Core dependencies from `requirements.txt`:
 - **matplotlib, seaborn**: Visualization
 - **nltk**: Text processing
 - **protobuf**: Model serialization
+- **pyside6**: GUI components (optional, for visualization tools)
+- **openpyxl**: Excel file support
+- **psutil**: System/process utilities
+- **datasets**: HuggingFace datasets (for prompt downloading)
 
 ---
 
@@ -321,8 +327,8 @@ python main.py generate "Your prompt here" ^
 
 **Parameters:**
 - `--model`: Model to use (`gpt2`, `gpt-oss-20b`, `gpt-oss-120b`)
-- `--delta`: Watermark strength (1.0-5.0, default 2.5)
-- `--entropy-threshold`: Minimum entropy for watermarking (1.0-6.0, default 4.0)
+- `--delta`: Watermark strength (1.0-5.0, default 3.5)
+- `--entropy-threshold`: Minimum entropy for watermarking (1.0-6.0, default 2.5)
 - `--max-new-tokens`: Number of tokens to generate
 - `-o, --output-file`: Output file path
 - `--key-file`: Where to save the secret key
@@ -505,14 +511,13 @@ Trace generated text back to specific users using BCH error-correcting codes wit
 
 #### How It Works
 
-- **BCH Codes**: Codewords are generated with guaranteed minimum Hamming distance (2, 3, or 4)
+- **BCH Codes**: Codewords are generated with guaranteed minimum Hamming distance of 2 (even-parity construction)
 - **Group Assignment**: Users are assigned to groups sequentially:
   - `group_id = user_id // users_per_group`
   - All users in the same group share the same group codeword
   - This prevents collusion attacks where users combine codewords to frame others
-- **Minimum Distance Options**:
-  - `--min-distance 2`: Up to 100 groups, 10 users per group (default)
-  - `--min-distance 3`: Up to 50 groups, 20 users per group
+- **Group Count**: Number of groups = 2^(group_bits - 1) due to BCH even-parity codeword construction
+  - Example: With L=10 bits, max groups = 2^(10-1) = 512 groups
 
 #### User Database
 
@@ -526,7 +531,7 @@ UserId,Username
 999,999
 ```
 
-You can customize usernames or add more users. The number of groups is limited by the minimum distance setting.
+You can customize usernames or add more users. The number of groups is limited to 2^(L-1) due to BCH even-parity construction.
 
 #### Generate for User
 
@@ -547,10 +552,8 @@ python -m src.main_multiuser generate ^
 ```
 
 **Key points:**
-- L=10 supports up to 2¹⁰ = 1024 users
-- `--min-distance 2` (default) assigns users to groups of 10
-- User 0 belongs to Group 0 (users 0-19)
-- User 20 belongs to Group 1 (users 20-39)
+- L=10 supports up to 2^(10-1) = 512 groups (due to BCH even-parity construction)
+- Users are assigned to groups sequentially based on `--users-per-group`
 - All users in the same group share the same codeword
 
 **Expected outputs:**
@@ -612,7 +615,7 @@ Use `--detailed` flag to see all user IDs in each group.
 #### How It Works
 
 - **Hierarchical Structure**: Two-stage codeword design
-  - **Group codewords**: Generated using BCH codes with guaranteed minimum Hamming distance (2 or 3)
+  - **Group codewords**: Generated using BCH even-parity codes with guaranteed minimum Hamming distance of 2
   - **User fingerprints**: Simple binary representations of user index within each group
   - **Combined codeword**: `group_code[group_bits] + user_code[user_bits] = L bits`
 - **Two-Stage Tracing**: 
@@ -667,19 +670,19 @@ python -m src.main_multiuser generate ^
 
 **Key points:**
 - `--group-bits` + `--user-bits` must equal `--l-bits`
-- L=8 with G=4, U=4: up to 2⁴ = 16 groups, 2⁴ = 16 users per group (256 total users)
+- L=8 with G=4, U=4: up to 2^(4-1) = 8 groups, 2⁴ = 16 users per group (128 total users)
 - User 0 belongs to Group 0, User 0 within that group
 - Each user's codeword = group codeword (4 bits) + user fingerprint (4 bits)
 
 **Parameters:**
 - `--group-bits`: Number of bits for group codewords (must satisfy `group-bits + user-bits == l-bits`)
 - `--user-bits`: Number of bits for user fingerprints within groups
-- `--min-distance`: Minimum Hamming distance between group codewords (2 or 3, default: 2)
+- `--min-distance`: Minimum Hamming distance between group codewords (fixed at 2)
 - `--max-groups` (optional): Maximum number of groups allowed (default: auto-calculated)
 - `--users-per-group` (optional): Number of users per group (default: auto-calculated, max = 2^user_bits)
 
 **Constraints:**
-- `--max-groups` must be ≤ 2^group_bits (e.g., with group_bits=4, max 16 groups)
+- `--max-groups` must be ≤ 2^(group_bits-1) due to BCH even-parity construction (e.g., with group_bits=4, max 8 groups)
 - `--users-per-group` must be ≤ 2^user_bits (e.g., with user_bits=4, max 16 users per group)
 - If CSV contains more users than `max_groups × users_per_group`, only the first N users are used
 
@@ -800,14 +803,16 @@ Robustness (perturbed text):
 **Usage:** Dispatches to subcommands (generate, detect, evaluate, etc.)
 **Run:** `python main.py <command> [args]`
 
-#### `src/watermark.py` (460 lines)
+#### `src/watermark.py` (1247 lines)
 **Purpose:** Core watermarking algorithms
 **Classes:**
 - `ZeroBitWatermarker`: Binary detection
 - `LBitWatermarker`: Message embedding
 - `NaiveMultiUserWatermarker`: Legacy per-user fingerprinting
 - `GroupedMultiUserWatermarker`: Fingerprinting with grouped codes
-- `WatermarkLogitsProcessor`: Transformers integration
+- `HiDyPaMultiUserWatermarker`: Hierarchical multi-user fingerprinting
+- `WatermarkLogitsProcessor`: Transformers integration (zero-bit)
+- `LBitLogitProcessor`: Transformers integration (L-bit)
 
 **Key functions:**
 - `derive_key(secret_key, context, suffix)`: HMAC-SHA256 key derivation
@@ -832,7 +837,7 @@ Robustness (perturbed text):
 
 **Usage:** Automatically instantiated by CLI based on `--model` flag
 
-#### `src/fingerprinting.py` (296 lines)
+#### `src/fingerprinting.py` (376 lines)
 **Purpose:** Multi-user codeword management using BCH error-correcting codes
 **Class:** `FingerprintingCode`
 
@@ -847,7 +852,7 @@ Robustness (perturbed text):
 
 **Parameters:**
 - `L` (int): Codeword length (default: 10)
-- `min_distance` (int): Minimum Hamming distance between codewords (2 or 3, default: 2)
+- `min_distance` (int): Minimum Hamming distance between codewords (fixed at 2)
 - `c` (int): Maximum number of colluders (default: 16)
 
 **Example:**
@@ -871,7 +876,7 @@ matches = code.trace(recovered)
 # Returns: [{"user_id": 0, "username": "0", "group_id": 0, "match_score_percent": 90.0, ...}]
 ```
 
-#### `src/commands.py` (398 lines)
+#### `src/commands.py` (404 lines)
 **Purpose:** CLI command implementations
 **Functions:**
 - `cmd_generate(args)`: Zero-bit generation
@@ -882,7 +887,7 @@ matches = code.trace(recovered)
 
 **Not called directly** (invoked by `main.py` based on subcommand)
 
-#### `src/parser.py` (157 lines)
+#### `src/parser.py` (166 lines)
 **Purpose:** Argument parsing and validation
 **Features:**
 - Subcommand routing
@@ -892,7 +897,7 @@ matches = code.trace(recovered)
 
 **Not called directly** (used by `main.py`)
 
-#### `src/utils.py` (209 lines)
+#### `src/utils.py` (208 lines)
 **Purpose:** Helper utilities
 **Functions:**
 - `instantiate_model(model_name)`: Create model instance
@@ -909,7 +914,7 @@ model = instantiate_model('gpt2')
 perturbed = delete_sentences(text, 'start', 0.2)  # Remove first 20%
 ```
 
-#### `src/main_multiuser.py` (128 lines)
+#### `src/main_multiuser.py` (254 lines)
 **Purpose:** Multi-user CLI
 **Commands:**
 - `generate`: Watermark text for user
@@ -1338,7 +1343,7 @@ All scripts in `slurm_scripts/` are HPC cluster batch job scripts for running ev
 - All scripts have **64-hour time limit**
 - Attack scripts (robustness, paraphrasing, rewrite, synonym) test **16 variants per prompt** (4 intensities × 4 modes)
 - All scripts use **Apptainer** containers (no host Python/venv setup needed)
-- Partition and account settings are configured in `config/hpc_paths.sh` (see [HPC Setup](#hpc-setup))
+- Partition and account settings are configured in `config/hpc_paths.sh` (see [HPC Cluster Usage](#hpc-cluster-usage))
 
 **Usage:**
 ```bash
@@ -1394,8 +1399,8 @@ Key parameters:
 
 | Parameter | Range | Default | Description |
 |-----------|-------|---------|-------------|
-| `--delta` | 1.0-5.0 | 2.5 | Watermark strength (higher = stronger signal, lower fluency) |
-| `--entropy-threshold` | 1.0-6.0 | 4.0 | Minimum entropy to watermark (higher = fewer, cleaner blocks) |
+| `--delta` | 1.0-5.0 | 3.5 | Watermark strength (higher = stronger signal, lower fluency) |
+| `--entropy-threshold` | 1.0-6.0 | 2.5 | Minimum entropy to watermark (higher = fewer, cleaner blocks) |
 | `--hashing-context` | 1-10 | 5 | Number of previous tokens for PRF context |
 | `--max-new-tokens` | 50-2048 | 512 | Generation length |
 
@@ -1410,7 +1415,7 @@ Key parameters:
 
 **Balanced (default):**
 ```bat
---delta 2.5 --entropy-threshold 4.0 --z-threshold 4.0
+--delta 3.5 --entropy-threshold 2.5 --z-threshold 4.0
 ```
 Good all-around performance
 
@@ -1556,7 +1561,7 @@ model = GptOssModel()  # Auto device_map="auto"
 
 **Setup:**
 ```python
-from src.models import Gpt Oss120bModel
+from src.models import GptOss120bModel
 model = GptOss120bModel()  # Requires substantial resources
 ```
 
@@ -1576,7 +1581,7 @@ python -c "import nltk; nltk.download('punkt', download_dir='/shared/nltk_data')
 
 ### Submit Job
 
-All SLURM scripts use **Apptainer** containers (no host Python/venv setup needed). Configure your partition and account in `config/hpc_paths.sh` (see [HPC Setup](#hpc-setup)). Pick the SLURM wrapper that matches your evaluation:
+All SLURM scripts use **Apptainer** containers (no host Python/venv setup needed). Configure your partition and account in `config/hpc_paths.sh` (see [HPC Cluster Usage](#hpc-cluster-usage)). Pick the SLURM wrapper that matches your evaluation:
 
 ```bash
 # Hi-DyPa detection evaluation (9 configurations, 300 prompts each)
@@ -1814,10 +1819,9 @@ python evaluation_scripts/compare_collusion_resistance.py ^
 ```
 
 **What it does:**
-1. Tests three approaches:
-   - **Naive**: Binary user ID-based fingerprinting
-   - **Min-distance-2**: Fingerprinting with minimum Hamming distance 2
-   - **Min-distance-3**: Fingerprinting with minimum Hamming distance 3
+1. Tests two approaches:
+   - **Naive**: Binary user ID-based fingerprinting (no grouping)
+   - **Hi-DyPa**: Hierarchical fingerprinting with minimum Hamming distance 2
 2. For each prompt:
    - Selects colluding users from different groups (ensures fair comparison)
    - Uses the same users for all three approaches
@@ -1838,9 +1842,7 @@ evaluation/collusion_resistance_<N>/
 │   │   ├── combined_normal.txt
 │   │   └── combined_with_deletion.txt
 │   └── prompt_1/, prompt_2/, ...
-├── min-distance-2/
-│   └── prompt_0/, prompt_1/, ...
-├── min-distance-3/
+├── hi_dypa/
 │   └── prompt_0/, prompt_1/, ...
 ├── prompt_results/
 │   └── prompt_0_results.json, prompt_1_results.json, ...
@@ -2173,11 +2175,11 @@ python helper_scripts\analyse.py evaluation/evaluation_results
 
 | Scenario | delta | entropy_threshold | z_threshold | max_new_tokens |
 |----------|-------|-------------------|-------------|----------------|
-| Default | 2.5 | 4.0 | 4.0 | 256 |
+| Default | 3.5 | 2.5 | 4.0 | 512 |
 | High fluency | 2.0 | 4.5 | 4.0 | 256 |
-| Strong detection | 3.5 | 3.5 | 3.5 | 512 |
+| Strong detection | 3.5 | 2.5 | 3.5 | 512 |
 | Short text | 3.0 | 3.5 | 3.5 | 128 |
-| Long text | 2.5 | 4.0 | 4.0 | 1024 |
+| Long text | 3.5 | 2.5 | 4.0 | 1024 |
 
 ---
 

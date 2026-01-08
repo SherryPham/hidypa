@@ -65,12 +65,12 @@ def main():
         choices=['naive', 'grouped', 'hi_dypa'],
         help="Multi-user scheme to use (default: grouped).",
     )
-    base_parser.add_argument('--min-distance', type=int, default=2, choices=[2, 3],
-                            help="Minimum Hamming distance between codewords for collusion resistance (default: 2).")
+    base_parser.add_argument('--min-distance', type=int, default=2, choices=[2],
+                            help="Minimum Hamming distance between codewords (fixed at 2 for BCH even-parity construction).")
     base_parser.add_argument('--max-groups', type=int, default=None,
-                            help="Maximum number of groups allowed (default: auto-calculated based on min-distance).")
+                            help="Maximum number of groups allowed (default: 2^(group_bits-1) for BCH construction).")
     base_parser.add_argument('--users-per-group', type=int, default=None,
-                            help="Number of users per group (default: auto-calculated based on min-distance).")
+                            help="Number of users per group (default: 2^user_bits).")
     base_parser.add_argument('--group-bits', type=int, default=None,
                             help="Number of bits for group codewords (required for Hi-DyPa scheme).")
     base_parser.add_argument('--user-bits', type=int, default=None,
