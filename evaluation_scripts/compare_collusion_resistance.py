@@ -289,6 +289,11 @@ def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_
             try:
                 # Use hi_dypa tracing: identifies suspect groups first, then searches within them
                 accused_users = muw.trace_from_codeword(merged_codeword)
+                
+                # Filter by minimum match score to reduce false positives
+                MIN_MATCH_SCORE = 70.0  # Only accuse users with >= 70% match
+                accused_users = [u for u in accused_users if u.get('match_score_percent', 0.0) >= MIN_MATCH_SCORE]
+                
                 matches = [u['user_id'] for u in accused_users]
                 
                 # Calculate Hamming distances for all users for completeness
