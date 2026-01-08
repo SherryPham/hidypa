@@ -1,0 +1,2 @@
+scheme,init_time_sec,init_memory_mb,storage_mb,num_groups,users_per_group,embed_time_sec,embed_overhead_percent,overhead_per_token_ms,time_per_token_ms,detect_time_sec,hmac_operations,trace_time_sec,trace_comparisons,max_users,max_groups,max_users_per_group,group_bits,user_bits
+hi_dypa_G4_U4,0.08152133302064613,1.6484375,0.000614166259765625,8,16.0,4.706900803224086,-17.75586019032646,-1.3921604814368833,9.748895213734226,1.765915672247686,16.0,0.0002159643891500309,128.0,256,16,16,4,4

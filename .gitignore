@@ -20,6 +20,6 @@ config/paths.py
 # Evaluation output directories (contain identifying paths in JSON files)
 # These are generated outputs and should not be committed
 # =============================================================================
-evaluation/
+
 evaluation_2_backup/
 COMMANDS.md
