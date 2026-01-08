@@ -5,8 +5,8 @@
 # NOTE: Update account and partition for your HPC environment
 # =============================================================================
 #SBATCH --job-name=lbit_sweep
-#SBATCH --account=oz411
-#SBATCH -p skylake-gpu
+#SBATCH --account=YOUR_ACCOUNT
+#SBATCH -p YOUR_PARTITION
 #SBATCH --gres=gpu:1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -59,7 +59,7 @@ run_py evaluation_scripts/run_lbit_sweep.py \
     --min-l 4 \
     --max-l 30 \
     --delta 3.5 \
-    --entropy-threshold 2.5 \
+    --entropy-threshold 2.5 \   
     --hashing-context 5 \
     --z-threshold 4.0 \
     --max-new-tokens 512 \
