@@ -1,0 +1,25 @@
+#!/bin/bash
+# =============================================================================
+# HPC-specific paths configuration (TEMPLATE)
+# Copy this file to config/hpc_paths.sh and fill in your values
+# DO NOT COMMIT config/hpc_paths.sh - only this example file
+# =============================================================================
+
+# SLURM account ID (your HPC allocation account)
+export HPC_ACCOUNT="your-account-id"
+
+# SLURM partition name (e.g., skylake-gpu, gpu, compute, etc.)
+export HPC_PARTITION="your-gpu-partition"
+
+# Project directory (where this repo is cloned on the HPC)
+export HPC_PROJECT="/path/to/your/project"
+
+# Apptainer/Singularity container path
+export HPC_SIF="/path/to/your/container.sif"
+
+# HuggingFace cache directory
+export HPC_HF_CACHE="/path/to/huggingface/cache"
+
+# Bind mount path for Apptainer (the base directory to mount, e.g., /scratch, /home)
+export HPC_BIND_PATH="/your/bind/path"
+

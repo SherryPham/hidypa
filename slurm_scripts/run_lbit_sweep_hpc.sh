@@ -1,8 +1,12 @@
 #!/bin/bash
 
+# =============================================================================
+# SLURM Job Configuration
+# NOTE: Update account and partition for your HPC environment
+# =============================================================================
 #SBATCH --job-name=lbit_sweep
-#SBATCH --account=oz411
-#SBATCH -p skylake-gpu
+#SBATCH --account=YOUR_ACCOUNT
+#SBATCH -p YOUR_PARTITION
 #SBATCH --gres=gpu:1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -10,12 +14,19 @@
 #SBATCH --mem=32G
 #SBATCH --time=12:00:00
 #SBATCH --output=slurm_out/slurm-%j.out
+
+# =============================================================================
+# Load HPC-specific paths from config file
+# =============================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../config/hpc_paths.sh"
+
 module --force purge
 module load apptainer
 
-PROJECT=/fred/oz411/kpham/crypto-watermark
-SIF=/fred/oz411/kpham/containers/crypto-watermark.sif
-HF=/fred/oz411/kpham/huggingface
+PROJECT=${HPC_PROJECT}
+SIF=${HPC_SIF}
+HF=${HPC_HF_CACHE}
 
 export HF_HOME=$HF
 export HF_HUB_CACHE=$HF
@@ -30,7 +41,7 @@ cd $PROJECT
 
 run_py () {
   apptainer exec --nv \
-    -B /fred \
+    -B ${HPC_BIND_PATH} \
     --env HF_HOME=$HF_HOME \
     --env HF_HUB_CACHE=$HF_HUB_CACHE \
     --env HF_DATASETS_CACHE=$HF_DATASETS_CACHE \
@@ -40,6 +51,7 @@ run_py () {
     --env HF_HUB_OFFLINE=$HF_HUB_OFFLINE \
     "$SIF" python3 "$@"
 }
+
 run_py evaluation_scripts/run_lbit_sweep.py \
     --prompts-file assets/prompts.txt \
     --max-prompts 300 \
@@ -47,7 +59,7 @@ run_py evaluation_scripts/run_lbit_sweep.py \
     --min-l 4 \
     --max-l 30 \
     --delta 3.5 \
-    --entropy-threshold 2.5 \   
+    --entropy-threshold 2.5 \
     --hashing-context 5 \
     --z-threshold 4.0 \
     --max-new-tokens 512 \

@@ -7,7 +7,7 @@
   "user_bits": 3,
   "num_prompts": 300,
   "random_seed": 797047915,
-  "output_directory": "/fred/oz411/kpham/crypto-watermark/evaluation/hi_dypa_detection/hi_dypa/G5_U3/job_7904366",
+  "output_directory": "evaluation/hi_dypa_detection/hi_dypa/G5_U3/job_7904366",
   "raw_results_file": null,
   "generated_utc": "2025-12-18T04:15:51.903557Z",
   "metrics": {

@@ -21,7 +21,7 @@
   "model": "gpt2",
   "run_tag": "job_7963207",
   "random_seed": 1000012662,
-  "output_directory": "/fred/oz411/kpham/crypto-watermark/evaluation/robustness/naive/L8/job_7963207",
+  "output_directory": "evaluation/robustness/naive/L8/job_7963207",
   "raw_results_file": null,
   "generated_utc": "2025-12-20T16:37:21.980978Z",
   "metrics": {

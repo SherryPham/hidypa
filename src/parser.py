@@ -44,10 +44,17 @@ def check_list_of(checker_func):
 
 def setup_nltk():
     """Checks for the NLTK 'punkt' tokenizer model"""
-    nltk_data_path = "/fred/oz413/rburke/huggingface"
+    # Try to load NLTK data path from config file
+    nltk_data_path = None
+    try:
+        from config.paths import NLTK_DATA_PATH
+        nltk_data_path = NLTK_DATA_PATH
+    except ImportError:
+        # Config file not found, use default NLTK paths
+        pass
     
-    # Add your custom path to NLTK's search paths
-    if nltk_data_path not in nltk.data.path:
+    # Add custom path to NLTK's search paths if configured
+    if nltk_data_path and nltk_data_path not in nltk.data.path:
         nltk.data.path.append(nltk_data_path)
 
     # Now, verify that the package can be found without triggering a download

@@ -1,6 +1,46 @@
-# Cryptographic Watermarking for Large Language Models (LLMs)
+# Hi-DyPa: Practical Multi-User Watermarking for Detection and Tracing in LLM System
 
-A comprehensive framework for embedding and detecting statistical watermarks in LLM-generated text. This implementation supports three watermarking schemes: **zero-bit** (binary detection), **L-bit** (message embedding), and **multi-user fingerprinting** (user tracing).
+A comprehensive framework for embedding and detecting statistical watermarks in LLM-generated text. This implementation supports five watermarking schemes: **zero-bit** (binary detection), **L-bit** (message embedding), **naive multi-user** (baseline fingerprinting), **grouped multi-user** (BCH-based fingerprinting), and **Hi-DyPa** (hierarchical multi-user fingerprinting).
+
+## About This Repository
+
+This codebase provides an open-source reimplementation of the multi-user watermarking schemes proposed by Cohen et al. in *Watermarking Language Models for Many Adaptive Users*. In particular, we implement the three theoretical schemes described in the paper as a unified, executable framework.
+
+Building on this reimplementation, we develop **Hi-DyPa**, a hierarchical multi-user watermarking scheme that extends the baseline framework with structured attribution and improved tracing efficiency. All baseline schemes and Hi-DyPa share the same underlying embedding pipeline, enabling controlled and fair comparisons.
+
+### Implemented Schemes
+
+This repository implements the following watermarking schemes:
+
+1. **Zero-Bit Watermarking** (`ZeroBitWatermarker`)
+   - Binary detection: determines whether text is watermarked (yes/no)
+   - Foundation for all other schemes
+   - Uses statistical z-score analysis over watermarked positions
+
+2. **L-Bit Watermarking** (`LBitWatermarker`)
+   - Embeds and recovers arbitrary binary messages of length L
+   - Enables message encoding in generated text
+   - Uses per-bit key derivation via HMAC-SHA256
+
+3. **Naive Multi-User Watermarking** (`NaiveMultiUserWatermarker`)
+   - Baseline multi-user scheme from Cohen et al.
+   - Assigns each user a unique L-bit codeword (binary expansion of user ID)
+   - Simple but vulnerable to collusion attacks
+
+4. **Grouped Multi-User Watermarking** (`GroupedMultiUserWatermarker`)
+   - BCH-based scheme from Cohen et al. with guaranteed minimum Hamming distance
+   - Groups users and assigns group codewords with error-correcting properties
+   - Improved collusion resistance compared to naive scheme
+   - Supports minimum Hamming distances of 2, 3, or 4
+
+5. **Hi-DyPa Multi-User Watermarking** (`HiDyPaMultiUserWatermarker`)
+   - **Our proposed hierarchical scheme** that extends the baseline framework
+   - Combines group-level codewords (with minimum Hamming distance) with per-user fingerprints
+   - Two-stage tracing: first identifies the group, then the user within the group
+   - Flexible allocation of bits between group and user identifiers
+   - Improved scalability and tracing efficiency compared to baseline schemes
+
+All schemes share the same underlying L-bit embedding mechanism, ensuring fair and controlled comparisons across different multi-user approaches.
 
 ## Table of Contents
 
@@ -12,7 +52,9 @@ A comprehensive framework for embedding and detecting statistical watermarks in 
 - [Detailed Usage](#detailed-usage)
   - [Zero-Bit Watermarking](#zero-bit-watermarking)
   - [L-Bit Watermarking](#l-bit-watermarking)
-  - [Multi-User Fingerprinting](#multi-user-fingerprinting)
+  - [Naive Multi-User Watermarking](#naive-multi-user-watermarking)
+  - [Grouped Multi-User Watermarking](#grouped-multi-user-watermarking)
+  - [Hi-DyPa Multi-User Watermarking](#hi-dypa-multi-user-watermarking)
   - [Batch Evaluation](#batch-evaluation)
 - [File-by-File Usage Guide](#file-by-file-usage-guide)
 - [Parameters and Tuning](#parameters-and-tuning)
@@ -45,11 +87,18 @@ This repository implements cryptographic watermarking techniques for LLM text ge
 3. During detection, test both hypotheses (0 and 1) for each bit position and recover the message
 
 **Multi-User Fingerprinting:**
+- **Naive Scheme:**
+  1. Assign each user a unique L-bit codeword (binary expansion of user ID)
+  2. Embed the user's codeword using L-bit watermarking
+  3. During tracing, match recovered codeword directly to user IDs
+  4. Simple but vulnerable to collusion attacks
+
 - **Grouped Scheme (BCH-Based):**
   1. Generate BCH codewords with guaranteed minimum Hamming distance (2, 3, or 4)
   2. Assign users to groups sequentially (all users in a group share the same group codeword)
   3. Embed the user's group codeword using L-bit watermarking
   4. During tracing, match recovered codeword to group(s) and identify accused users
+  5. Improved collusion resistance compared to naive scheme
 
 - **Hi-DyPa Scheme:**
   1. Generate group codewords with minimum Hamming distance (for cross-group collusion resistance)
@@ -57,12 +106,13 @@ This repository implements cryptographic watermarking techniques for LLM text ge
   3. Combine group codeword + user fingerprint to create L-bit message
   4. Embed the combined codeword using L-bit watermarking
   5. During tracing, first identify the group, then identify the user within that group
+  6. Improved scalability and tracing efficiency compared to baseline schemes
 
 ---
 
 ## Features
 
-**Three watermarking modes**: Zero-bit detection, L-bit message embedding, multi-user tracing
+**Five watermarking schemes**: Zero-bit detection, L-bit message embedding, naive multi-user tracing, grouped multi-user tracing (BCH-based), and Hi-DyPa hierarchical multi-user tracing
 **Multiple model support**: GPT-2 (local), GPT-OSS-20B, GPT-OSS-120B
 **Multiple interfaces**: CLI, SLURM batch scripts
 **Robustness testing**: Built-in perturbation attacks (deletion, paraphrasing)
@@ -385,9 +435,73 @@ Decision: MESSAGE RECOVERED SUCCESSFULLY ✓
 
 ---
 
-### Multi-User Fingerprinting (BCH-Based)
+### Naive Multi-User Watermarking
 
-Trace generated text back to specific users using BCH error-correcting codes with guaranteed minimum Hamming distance for improved collusion resistance.
+The baseline multi-user scheme from Cohen et al. that assigns each user a unique L-bit codeword (binary expansion of user ID). This scheme is simple but vulnerable to collusion attacks where multiple users combine their outputs.
+
+#### How It Works
+
+- Each user receives a unique L-bit codeword based on their user ID
+- The codeword is the binary representation of the user ID (padded/truncated to L bits)
+- Uses L-bit watermarking to embed the user's codeword
+- During tracing, matches recovered codeword to user IDs
+
+#### Generate for User
+
+```bat
+python -m src.main_multiuser generate ^
+  --users-file assets/users.csv ^
+  --model gpt2 ^
+  --user-id 42 ^
+  --l-bits 10 ^
+  --scheme naive ^
+  --delta 2.5 ^
+  --entropy-threshold 4.0 ^
+  --max-new-tokens 512 ^
+  --key-file demonstration\naive_master.key ^
+  -o demonstration\naive_user42.txt ^
+  "The future of AI is"
+```
+
+**Key points:**
+- L=10 supports up to 2¹⁰ = 1024 users
+- Each user gets a unique codeword (no grouping)
+- User 42's codeword is the binary representation of 42
+
+**Expected outputs:**
+1. **naive_user42.txt**: Text watermarked with user 42's codeword
+2. **naive_master.key**: Master key (shared across all users)
+3. Console output showing the user's codeword
+
+#### Trace User
+
+```bat
+python -m src.main_multiuser trace ^
+  --users-file assets/users.csv ^
+  --model gpt2 ^
+  --l-bits 10 ^
+  --scheme naive ^
+  --key-file demonstration\naive_master.key ^
+  demonstration\naive_user42.txt
+```
+
+**Expected output:**
+```
+--- Trace Results ---
+  Text traced back to user(s):
+     - User ID: 42, Username: 42, Match: 100.00%
+```
+
+**Limitations:**
+- Vulnerable to collusion: multiple users can combine codewords to frame others
+- No error correction: single bit errors can misidentify users
+- Consider using Grouped or Hi-DyPa schemes for better collusion resistance
+
+---
+
+### Grouped Multi-User Watermarking
+
+Trace generated text back to specific users using BCH error-correcting codes with guaranteed minimum Hamming distance for improved collusion resistance. This is the BCH-based scheme from Cohen et al.
 
 #### How It Works
 
@@ -422,12 +536,13 @@ python -m src.main_multiuser generate ^
   --model gpt2 ^
   --user-id 0 ^
   --l-bits 10 ^
+  --scheme grouped ^
   --min-distance 2 ^
   --delta 2.5 ^
   --entropy-threshold 4.0 ^
   --max-new-tokens 512 ^
-  --key-file demonstration\multiuser_master.key ^
-  -o demonstration\multiuser_user0.txt ^
+  --key-file demonstration\grouped_master.key ^
+  -o demonstration\grouped_user0.txt ^
   "The future of AI is"
 ```
 
@@ -439,8 +554,8 @@ python -m src.main_multiuser generate ^
 - All users in the same group share the same codeword
 
 **Expected outputs:**
-1. **multiuser_user0.txt**: Text watermarked with user 0's group codeword
-2. **multiuser_master.key**: Master key (shared across all users)
+1. **grouped_user0.txt**: Text watermarked with user 0's group codeword
+2. **grouped_master.key**: Master key (shared across all users)
 3. Console output showing: "User ID 0 belongs to Group 0"
 
 #### Trace User
@@ -450,9 +565,10 @@ python -m src.main_multiuser trace ^
   --users-file assets/users.csv ^
   --model gpt2 ^
   --l-bits 10 ^
+  --scheme grouped ^
   --min-distance 2 ^
-  --key-file demonstration\multiuser_master.key ^
-  demonstration\multiuser_user0.txt
+  --key-file demonstration\grouped_master.key ^
+  demonstration\grouped_user0.txt
 ```
 
 **Expected output:**
@@ -486,6 +602,129 @@ python helper_scripts/visualize_groups.py ^
 - Any distance violations (if minimum distance is not satisfied)
 
 Use `--detailed` flag to see all user IDs in each group.
+
+---
+
+### Hi-DyPa Multi-User Watermarking
+
+**Our proposed hierarchical scheme** that extends the baseline framework with structured attribution and improved tracing efficiency. Hi-DyPa combines group-level codewords (with minimum Hamming distance for cross-group collusion resistance) with per-user fingerprints within each group.
+
+#### How It Works
+
+- **Hierarchical Structure**: Two-stage codeword design
+  - **Group codewords**: Generated using BCH codes with guaranteed minimum Hamming distance (2 or 3)
+  - **User fingerprints**: Simple binary representations of user index within each group
+  - **Combined codeword**: `group_code[group_bits] + user_code[user_bits] = L bits`
+- **Two-Stage Tracing**: 
+  1. First identifies the group from the group codeword
+  2. Then identifies the user within that group from the user fingerprint
+- **Flexible Bit Allocation**: You can allocate L bits between group and user identifiers
+  - More group bits → more groups, fewer users per group
+  - More user bits → fewer groups, more users per group
+- **Improved Efficiency**: Hierarchical structure enables faster tracing and better scalability
+
+#### Generate for User
+
+**Basic usage (G=4, U=4, L=8):**
+```bat
+python -m src.main_multiuser generate ^
+  --users-file assets/users.csv ^
+  --model gpt2 ^
+  --user-id 0 ^
+  --l-bits 8 ^
+  --scheme hi_dypa ^
+  --group-bits 4 ^
+  --user-bits 4 ^
+  --min-distance 2 ^
+  --delta 2.5 ^
+  --entropy-threshold 4.0 ^
+  --max-new-tokens 512 ^
+  --key-file demonstration\hi_dypa_master.key ^
+  -o demonstration\hi_dypa_user0.txt ^
+  "The future of AI is"
+```
+
+**With explicit group/user control:**
+```bat
+python -m src.main_multiuser generate ^
+  --users-file assets/users.csv ^
+  --model gpt2 ^
+  --user-id 0 ^
+  --l-bits 8 ^
+  --scheme hi_dypa ^
+  --group-bits 4 ^
+  --user-bits 4 ^
+  --min-distance 2 ^
+  --max-groups 8 ^
+  --users-per-group 16 ^
+  --delta 2.5 ^
+  --entropy-threshold 4.0 ^
+  --max-new-tokens 512 ^
+  --key-file demonstration\hi_dypa_master.key ^
+  -o demonstration\hi_dypa_user0.txt ^
+  "The future of AI is"
+```
+
+**Key points:**
+- `--group-bits` + `--user-bits` must equal `--l-bits`
+- L=8 with G=4, U=4: up to 2⁴ = 16 groups, 2⁴ = 16 users per group (256 total users)
+- User 0 belongs to Group 0, User 0 within that group
+- Each user's codeword = group codeword (4 bits) + user fingerprint (4 bits)
+
+**Parameters:**
+- `--group-bits`: Number of bits for group codewords (must satisfy `group-bits + user-bits == l-bits`)
+- `--user-bits`: Number of bits for user fingerprints within groups
+- `--min-distance`: Minimum Hamming distance between group codewords (2 or 3, default: 2)
+- `--max-groups` (optional): Maximum number of groups allowed (default: auto-calculated)
+- `--users-per-group` (optional): Number of users per group (default: auto-calculated, max = 2^user_bits)
+
+**Constraints:**
+- `--max-groups` must be ≤ 2^group_bits (e.g., with group_bits=4, max 16 groups)
+- `--users-per-group` must be ≤ 2^user_bits (e.g., with user_bits=4, max 16 users per group)
+- If CSV contains more users than `max_groups × users_per_group`, only the first N users are used
+
+**Expected outputs:**
+1. **hi_dypa_user0.txt**: Text watermarked with user 0's combined codeword
+2. **hi_dypa_master.key**: Master key (shared across all users)
+3. Console output showing: "User ID 0 belongs to Group 0, User 0 within group"
+
+#### Trace User
+
+```bat
+python -m src.main_multiuser trace ^
+  --users-file assets/users.csv ^
+  --model gpt2 ^
+  --l-bits 8 ^
+  --scheme hi_dypa ^
+  --group-bits 4 ^
+  --user-bits 4 ^
+  --min-distance 2 ^
+  --max-groups 8 ^
+  --users-per-group 16 ^
+  --key-file demonstration\hi_dypa_master.key ^
+  demonstration\hi_dypa_user0.txt
+```
+
+**Important:** Use the same `--group-bits`, `--user-bits`, `--min-distance`, `--max-groups`, and `--users-per-group` values that were used during generation.
+
+**Expected output:**
+```
+--- Trace Results ---
+  Text traced back to user(s):
+     - User ID: 0, Username: 0, Group: 0, Match: 100.00%
+       User ID 0 belongs to Group 0, User 0 within group
+```
+
+**Two-stage tracing:**
+- First stage: Identifies the group from the group codeword portion
+- Second stage: Identifies the user within that group from the user fingerprint portion
+- More efficient than flat codeword matching
+
+**Advantages over baseline schemes:**
+- **Improved scalability**: Hierarchical structure supports larger user bases
+- **Faster tracing**: Two-stage process reduces search space
+- **Flexible allocation**: Can optimize group/user bit allocation for specific use cases
+- **Collusion resistance**: Group codewords maintain minimum Hamming distance
 
 ---
 
@@ -1099,7 +1338,7 @@ All scripts in `slurm_scripts/` are HPC cluster batch job scripts for running ev
 - All scripts have **64-hour time limit**
 - Attack scripts (robustness, paraphrasing, rewrite, synonym) test **16 variants per prompt** (4 intensities × 4 modes)
 - All scripts use **Apptainer** containers (no host Python/venv setup needed)
-- All scripts run on **skylake-gpu** partition
+- Partition and account settings are configured in `config/hpc_paths.sh` (see [HPC Setup](#hpc-setup))
 
 **Usage:**
 ```bash
@@ -1337,7 +1576,7 @@ python -c "import nltk; nltk.download('punkt', download_dir='/shared/nltk_data')
 
 ### Submit Job
 
-All SLURM scripts use **Apptainer** containers (no host Python/venv setup needed) and run on the **skylake-gpu** partition with **64-hour time limits**. Pick the SLURM wrapper that matches your evaluation:
+All SLURM scripts use **Apptainer** containers (no host Python/venv setup needed). Configure your partition and account in `config/hpc_paths.sh` (see [HPC Setup](#hpc-setup)). Pick the SLURM wrapper that matches your evaluation:
 
 ```bash
 # Hi-DyPa detection evaluation (9 configurations, 300 prompts each)
@@ -1878,10 +2117,8 @@ If you use this codebase in your research, please cite:
 
 ```bibtex
 @software{cryptographic_watermarking_llm,
-  title={Cryptographic Watermarking for Large Language Models},
-  author={[Your Name]},
-  year={2025},
-  url={https://github.com/yourusername/Cryptographic-Watermarking-for-LLM}
+  title={Hi-DyPa: Practical Multi-User Watermarking for Detection and Tracing in LLM System},
+  year={2025}
 }
 ```
 
@@ -1894,7 +2131,7 @@ Contributions are welcome! Please:
 
 ### Issues
 
-Report bugs and request features at: [GitHub Issues](https://github.com/yourusername/Cryptographic-Watermarking-for-LLM/issues)
+For issues and feature requests, please refer to the anonymous repository.
 
 ---
 
@@ -1969,6 +2206,5 @@ A: Depends on text length and parameters. Longer text → more blocks → can em
 **For more details, see:**
 - `COMMANDS.md` - Copy-paste command examples
 - `src/watermark.py` - Implementation details
-- GitHub Issues - Community support
 
 **Happy watermarking! 🔐**

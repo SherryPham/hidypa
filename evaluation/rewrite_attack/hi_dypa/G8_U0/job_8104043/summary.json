@@ -21,7 +21,7 @@
     "random"
   ],
   "random_seed": 96373875,
-  "output_directory": "/fred/oz411/kpham/crypto-watermark/evaluation/rewrite_attack/hi_dypa/G8_U0/job_8104043",
+  "output_directory": "evaluation/rewrite_attack/hi_dypa/G8_U0/job_8104043",
   "raw_results_file": null,
   "generated_utc": "2026-01-04T04:09:12.697060Z",
   "metrics": {

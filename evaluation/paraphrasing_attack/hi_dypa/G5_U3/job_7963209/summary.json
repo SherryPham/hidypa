@@ -21,7 +21,7 @@
     "random"
   ],
   "random_seed": 1102283432,
-  "output_directory": "/fred/oz411/kpham/crypto-watermark/evaluation/paraphrasing_attack/hi_dypa/G5_U3/job_7963209",
+  "output_directory": "evaluation/paraphrasing_attack/hi_dypa/G5_U3/job_7963209",
   "raw_results_file": null,
   "generated_utc": "2025-12-21T22:17:42.555746Z",
   "metrics": {
