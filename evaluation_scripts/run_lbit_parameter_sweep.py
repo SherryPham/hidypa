@@ -1,5 +1,5 @@
 # run_lbit_parameter_sweep.py
-# Script to run L-bit embedding and detection for L = 8 to 10
+# Script to run L-bit embedding and detection for L = 8 (fixed)
 # Sweeps through different delta and entropy_threshold values
 # Uses prompts.txt and outputs JSONs and CSV summary
 
@@ -64,7 +64,7 @@ def calculate_bit_accuracy(original: str, recovered: str) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run L-bit parameter sweep for L = 8 to 10 with different delta and entropy_threshold values",
+        description="Run L-bit parameter sweep for L = 8 (fixed) with different delta and entropy_threshold values",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
@@ -127,14 +127,14 @@ def main():
     parser.add_argument(
         '--min-l',
         type=int,
-        default=4,
-        help='Minimum L value (default: 4)'
+        default=8,
+        help='Minimum L value (default: 8)'
     )
     parser.add_argument(
         '--max-l',
         type=int,
-        default=20,
-        help='Maximum L value (default: 20)'
+        default=8,
+        help='Maximum L value (default: 8)'
     )
     
     args = parser.parse_args()
