@@ -505,6 +505,30 @@ def collect_and_aggregate_summaries(
     df['false_positive_rate_2_colluders'] = fp_rates_2
     df['false_positive_rate_3_colluders'] = fp_rates_3
     
+    # Calculate average wrongly accused users per prompt for each case type
+    all_case_types = case_types_2 + case_types_3
+    for case_type in all_case_types:
+        fp_col = f"{case_type}_false_positives"
+        total_col = f"{case_type}_total"
+        avg_col = f"{case_type}_avg_wrongly_accused_per_prompt"
+        
+        if fp_col in df.columns and total_col in df.columns:
+            avg_values = []
+            for idx, row in df.iterrows():
+                fp_val = row.get(fp_col)
+                total_val = row.get(total_col)
+                if pd.notna(fp_val) and pd.notna(total_val) and fp_val != "" and total_val != "":
+                    try:
+                        fp_val = float(fp_val)
+                        total_val = float(total_val)
+                        avg = fp_val / total_val if total_val > 0 else 0.0
+                        avg_values.append(avg)
+                    except (ValueError, TypeError):
+                        avg_values.append(0.0)
+                else:
+                    avg_values.append(0.0)
+            df[avg_col] = avg_values
+    
     # Sort by scheme, then group_bits, then user_bits, then num_colluders for consistent ordering
     sort_columns = ["scheme", "group_bits", "user_bits", "num_colluders"]
     available_sort_columns = [col for col in sort_columns if col in df.columns]
@@ -521,6 +545,70 @@ def collect_and_aggregate_summaries(
     print(f"  Contains {len(df)} rows (configurations × colluder counts) with {len(df.columns)} columns")
     
     return csv_path
+
+
+def print_avg_wrongly_accused_summary(csv_path: str):
+    """
+    Print a summary table of average wrongly accused users per prompt from the CSV.
+    
+    Args:
+        csv_path: Path to the CSV file containing the aggregated results
+    """
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception as e:
+        print(f"  Warning: Could not read CSV file {csv_path}: {e}")
+        return
+    
+    print("\n" + "=" * 80)
+    print(" " * 20 + "AVERAGE WRONGLY ACCUSED USERS PER PROMPT")
+    print("=" * 80)
+    
+    # Case types to check
+    case_types_2 = ['same_group_2', 'cross_group_2']
+    case_types_3 = ['same_group_3', 'cross_group_3', 'mixed_2same_1diff']
+    all_case_types = case_types_2 + case_types_3
+    
+    # Group by scheme and configuration
+    for scheme in df['scheme'].unique():
+        scheme_df = df[df['scheme'] == scheme]
+        print(f"\n{scheme.upper()} Scheme:")
+        print("-" * 80)
+        
+        for idx, row in scheme_df.iterrows():
+            # Build config label
+            if scheme == 'naive':
+                config_label = f"L{row.get('l_bits', '?')}"
+            else:
+                g_bits = row.get('group_bits', '?')
+                u_bits = row.get('user_bits', '?')
+                config_label = f"G{g_bits}_U{u_bits}"
+            
+            num_colluders = row.get('num_colluders', '?')
+            print(f"\n  Config: {config_label} | {num_colluders} Colluders")
+            
+            # Print averages for each case type
+            for case_type in all_case_types:
+                avg_col = f"{case_type}_avg_wrongly_accused_per_prompt"
+                fp_col = f"{case_type}_false_positives"
+                total_col = f"{case_type}_total"
+                
+                if avg_col in df.columns:
+                    avg_val = row.get(avg_col)
+                    fp_val = row.get(fp_col)
+                    total_val = row.get(total_col)
+                    
+                    if pd.notna(avg_val) and pd.notna(fp_val) and pd.notna(total_val):
+                        try:
+                            avg_val = float(avg_val)
+                            fp_val = float(fp_val)
+                            total_val = float(total_val)
+                            if total_val > 0:
+                                print(f"    {case_type:25s}: {avg_val:6.2f} users/prompt (total: {fp_val:.0f} across {total_val:.0f} prompts)")
+                        except (ValueError, TypeError):
+                            pass
+    
+    print("\n" + "=" * 80)
 
 
 def main():
@@ -540,6 +628,9 @@ def main():
             args.output_dir, filter_tag, args.csv_summary_path
         )
         print(f"\nCSV summary: {csv_path}")
+        
+        # Print average wrongly accused users per prompt summary
+        print_avg_wrongly_accused_summary(csv_path)
         return
 
     # Normal mode: run evaluations
@@ -582,6 +673,9 @@ def main():
             args.output_dir, run_tag, args.csv_summary_path
         )
         print(f"\nCSV summary: {csv_path}")
+        
+        # Print average wrongly accused users per prompt summary
+        print_avg_wrongly_accused_summary(csv_path)
 
 
 if __name__ == "__main__":
