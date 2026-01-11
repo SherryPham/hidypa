@@ -23,3 +23,4 @@ config/paths.py
 
 evaluation_2_backup/
 COMMANDS.md
+test_evaluation/
