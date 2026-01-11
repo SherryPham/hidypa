@@ -390,6 +390,8 @@ def collect_and_aggregate_summaries_concise(
     Collect all summary.json files and create a concise CSV with ratio-specific columns.
     For each ratio (0.05, 0.10, 0.15, 0.20, etc.), creates columns like:
     - {ratio}_full_identity_accuracy
+    - {ratio}_group_accuracy
+    - {ratio}_user_accuracy
     - {ratio}_false_positive_rate
     (averaged across all modes for that ratio)
     
@@ -506,8 +508,8 @@ def collect_and_aggregate_summaries_concise(
         # Get all unique ratios and sort them
         ratios = sorted(ratio_metrics.keys(), key=lambda x: float(x))
         
-        # Only include these two metrics for each ratio
-        target_metrics = ["full_identity_accuracy", "false_positive_rate"]
+        # Include these metrics for each ratio
+        target_metrics = ["full_identity_accuracy", "group_accuracy", "user_accuracy", "false_positive_rate"]
         
         # For each ratio, average metrics across all modes and create columns
         for ratio in ratios:
