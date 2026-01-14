@@ -28,7 +28,6 @@ from src.watermark import (
     HiDyPaMultiUserWatermarker
 )
 from src.utils import get_model, parse_final_output
-from src.fingerprinting import generate_user_fingerprint
 
 
 def json_default_encoder(obj):
@@ -269,11 +268,10 @@ def save_raw_results(records: list[dict], output_path: str):
 def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_ids: list[int]) -> dict:
     """
     Try to trace back to original colluding users using the merged codeword.
-    Returns a ranked suspect list of size <= K (where K = number of colluders),
-    only including additional suspects if they are "close enough" to the best one.
-    
-    For Hi-DyPa schemes: hierarchical candidate generation with group distances and user distances.
-    For naive schemes: ranked top list with margin-based selection.
+    For Hi-DyPa schemes, uses the built-in trace_from_codeword method which
+    first identifies suspect groups, then searches only within those groups.
+    For naive schemes, uses direct codeword matching with Hamming distance.
+    Checks ALL users to properly detect false positives (innocent users incorrectly accused).
     
     Args:
         muw: Multi-user watermarker instance
@@ -282,269 +280,33 @@ def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_
         original_user_ids: List of original colluding user IDs
     
     Returns:
-        Dictionary with tracing results including success status and accused user IDs (size <= K)
+        Dictionary with tracing results including success status
     """
-    # Configuration constants
-    K = len(original_user_ids)  # Number of colluders
-    MAX_GROUPS = 3  # Maximum number of candidate groups to consider for Hi-DyPa
-    MIN_GROUP_BITS = 2  # Minimum valid group bits required for group shortlisting
-    GROUP_MARGIN = 1  # Distance margin for group shortlisting (to reduce tie brittleness)
-    MARGIN = 1  # Distance margin: only include candidates within best_score + MARGIN
-    MIN_RETURN = 1  # Always return at least one candidate if any valid candidate exists
-    
     try:
-        # For Hi-DyPa schemes, use hierarchical candidate generation
-        if hasattr(muw, 'group_codewords') and hasattr(muw, 'group_bits') and hasattr(muw, 'user_bits') and muw.group_codewords:
+        # For Hi-DyPa schemes, use the built-in trace_from_codeword method
+        # This is more efficient and accurate as it first identifies suspect groups
+        if hasattr(muw, 'trace_from_codeword') and hasattr(muw, 'group_codewords') and muw.group_codewords:
             try:
-                # Split recovered bits
-                recovered_group_bits = merged_codeword[:muw.group_bits]
-                recovered_user_bits = merged_codeword[muw.group_bits:]
+                # Use hi_dypa tracing: identifies suspect groups first, then searches within them
+                accused_users = muw.trace_from_codeword(merged_codeword)
                 
-                # Define valid positions
-                group_valid = [i for i, c in enumerate(recovered_group_bits) if c in ('0', '1')]
-                user_valid = [i for i, c in enumerate(recovered_user_bits) if c in ('0', '1')]
+                # Filter by minimum match score to reduce false positives
+                MIN_MATCH_SCORE = 70.0  # Only accuse users with >= 70% match
+                accused_users = [u for u in accused_users if u.get('match_score_percent', 0.0) >= MIN_MATCH_SCORE]
                 
-                # PROBLEM 1 FIX: If no valid bits at all, return early with no accusations
-                if len(group_valid) == 0 and len(user_valid) == 0:
-                    # Calculate Hamming distances for all users (for completeness)
-                    hamming_distances = {}
-                    valid_positions = [i for i, c in enumerate(merged_codeword) if c in ('0', '1')]
-                    for user_id in range(muw.N):
-                        try:
-                            user_codeword = muw.get_codeword_for_user(user_id)
-                            if valid_positions:
-                                hamming_dist = sum(
-                                    merged_codeword[i] != user_codeword[i]
-                                    for i in valid_positions
-                                )
-                            else:
-                                hamming_dist = float('inf')
-                            hamming_distances[user_id] = hamming_dist
-                        except Exception:
-                            hamming_distances[user_id] = float('inf')
-                    
-                    return {
-                        'success': False,
-                        'accused_user_ids': [],
-                        'original_user_ids': original_user_ids,
-                        'merged_codeword': merged_codeword,
-                        'hamming_distances': hamming_distances,
-                        'method': 'hi_dypa_no_valid_bits',
-                        'K': K,
-                        'MARGIN': MARGIN,
-                        'reason': 'no_valid_bits'
-                    }
+                matches = [u['user_id'] for u in accused_users]
                 
-                # PROBLEM 2 FIX: If group evidence is too weak, skip group shortlisting
-                # Adaptive MIN_GROUP_BITS: use min(2, group_bits) to allow shortlisting when group_bits=1
-                min_group_bits_adaptive = min(2, muw.group_bits)
-                # If no valid group positions OR too few valid group bits, fall back to global user ranking
-                if len(group_valid) < min_group_bits_adaptive:
-                    # Fall through to naive-style ranking
-                    candidates = []
-                    all_user_ids = list(range(muw.N))
-                    valid_positions = [i for i, c in enumerate(merged_codeword) if c in ('0', '1')]
-                    
-                    # Safety check: if no valid positions at all, return early
-                    if len(valid_positions) == 0:
-                        hamming_distances = {}
-                        for user_id in all_user_ids:
-                            try:
-                                user_codeword = muw.get_codeword_for_user(user_id)
-                                hamming_distances[user_id] = float('inf')
-                            except Exception:
-                                hamming_distances[user_id] = float('inf')
-                        
-                        return {
-                            'success': False,
-                            'accused_user_ids': [],
-                            'original_user_ids': original_user_ids,
-                            'merged_codeword': merged_codeword,
-                            'hamming_distances': hamming_distances,
-                            'method': 'hi_dypa_fallback_no_valid_bits',
-                            'K': K,
-                            'MARGIN': MARGIN,
-                            'reason': 'no_valid_bits'
-                        }
-                    
-                    for user_id in all_user_ids:
-                        try:
-                            user_codeword = muw.get_codeword_for_user(user_id)
-                            dist = sum(
-                                merged_codeword[i] != user_codeword[i]
-                                for i in valid_positions
-                            )
-                            candidates.append((user_id, dist))
-                        except Exception:
-                            continue
-                    
-                    # Sort by distance
-                    candidates.sort(key=lambda x: x[1])
-                    
-                    # Apply margin-based selection
-                    accused_user_ids = []
-                    if candidates:
-                        best_dist = candidates[0][1]
-                        for user_id, dist in candidates:
-                            if len(accused_user_ids) >= K:
-                                break
-                            if dist <= best_dist + MARGIN:
-                                accused_user_ids.append(user_id)
-                        
-                        # Ensure at least one if candidates exist
-                        if not accused_user_ids and MIN_RETURN == 1:
-                            accused_user_ids = [candidates[0][0]]
-                    
-                    # Calculate Hamming distances for all users
-                    hamming_distances = {}
-                    for user_id in range(muw.N):
-                        try:
-                            user_codeword = muw.get_codeword_for_user(user_id)
-                            if valid_positions:
-                                hamming_dist = sum(
-                                    merged_codeword[i] != user_codeword[i]
-                                    for i in valid_positions
-                                )
-                            else:
-                                hamming_dist = float('inf')
-                            hamming_distances[user_id] = hamming_dist
-                        except Exception:
-                            hamming_distances[user_id] = float('inf')
-                    
-                    return {
-                        'success': bool(set(accused_user_ids) & set(original_user_ids)),
-                        'accused_user_ids': accused_user_ids,
-                        'original_user_ids': original_user_ids,
-                        'merged_codeword': merged_codeword,
-                        'hamming_distances': hamming_distances,
-                        'method': 'hi_dypa_fallback_global',
-                        'K': K,
-                        'MARGIN': MARGIN
-                    }
-                
-                # Compute group distances for each group
-                group_dist_dict = {}  # group_id -> distance
-                for group_id in muw.group_codewords.keys():
-                    # Get group codeword (may be int or string, convert to string if needed)
-                    group_codeword_raw = muw.group_codewords[group_id]
-                    if isinstance(group_codeword_raw, int):
-                        group_codeword = format(group_codeword_raw, f'0{muw.group_bits}b')
-                    else:
-                        group_codeword = str(group_codeword_raw)
-                        # Pad/validate to ensure correct length
-                        group_codeword = group_codeword.zfill(muw.group_bits)
-                    
-                    # Validate length and skip if wrong
-                    if len(group_codeword) != muw.group_bits:
-                        continue
-                    
-                    # Compare only on valid group positions
-                    group_dist = sum(
-                        recovered_group_bits[i] != group_codeword[i]
-                        for i in group_valid
-                    )
-                    group_dist_dict[group_id] = group_dist
-                
-                # Group shortlisting with margin to reduce tie brittleness
-                if group_dist_dict:
-                    best_group_dist = min(group_dist_dict.values())
-                    # Include groups within best + GROUP_MARGIN
-                    candidate_groups = [
-                        gid for gid, dist in group_dist_dict.items()
-                        if dist <= best_group_dist + GROUP_MARGIN
-                    ]
-                    # If still too many, sort and take top MAX_GROUPS
-                    if len(candidate_groups) > MAX_GROUPS:
-                        candidate_groups.sort(key=lambda gid: (group_dist_dict[gid], gid))
-                        candidate_groups = candidate_groups[:MAX_GROUPS]
-                else:
-                    candidate_groups = []
-                
-                # Build group_to_users mapping if missing
-                # Check if group_to_users exists and is usable
-                if not hasattr(muw, 'group_to_users') or muw.group_to_users is None:
-                    # Build from user_to_group if available
-                    if hasattr(muw, 'user_to_group') and muw.user_to_group is not None:
-                        group_to_users_local = {}
-                        for user_id, group_id in muw.user_to_group.items():
-                            if group_id not in group_to_users_local:
-                                group_to_users_local[group_id] = []
-                            group_to_users_local[group_id].append(user_id)
-                        group_to_users = group_to_users_local
-                    else:
-                        # No group mapping available, fall back to global ranking
-                        group_to_users = None
-                else:
-                    group_to_users = muw.group_to_users
-                
-                # If we can't build group_to_users, fall back to global ranking
-                if group_to_users is None:
-                    # Fall through to global user ranking (will be handled after the try block)
-                    raise ValueError("Cannot build group_to_users mapping, falling back to global ranking")
-                
-                # For each candidate group, score users in that group
-                all_candidates = []  # List of (user_id, group_id, group_dist, user_dist, combined_dist)
-                
-                for group_id in candidate_groups:
-                    group_dist = group_dist_dict[group_id]
-                    
-                    # Get users in this group
-                    if isinstance(group_to_users, dict):
-                        users_in_group = group_to_users.get(group_id, [])
-                    else:  # list format
-                        users_in_group = group_to_users[group_id] if group_id < len(group_to_users) else []
-                    
-                    for user_id in users_in_group:
-                        try:
-                            # Get user index within group
-                            user_index_in_group = users_in_group.index(user_id)
-                            
-                            # Generate expected user fingerprint
-                            if muw.user_bits == 0 or not user_valid:
-                                user_dist = 0  # Group-only mode or no valid user bits
-                            else:
-                                expected_user_bits = generate_user_fingerprint(user_index_in_group, muw.user_bits)
-                                user_dist = sum(
-                                    recovered_user_bits[i] != expected_user_bits[i]
-                                    for i in user_valid
-                                )
-                            
-                            combined_dist = group_dist + user_dist
-                            all_candidates.append((user_id, group_id, group_dist, user_dist, combined_dist))
-                        except Exception:
-                            continue
-                
-                # If all_candidates is empty, fall back to global ranking
-                if not all_candidates:
-                    # Fall through to global user ranking (will be handled after the try block)
-                    raise ValueError("No candidates found in candidate groups, falling back to global ranking")
-                
-                # Sort candidates by: combined_dist asc, then user_dist asc, then group_dist asc
-                all_candidates.sort(key=lambda x: (x[4], x[3], x[2]))
-                
-                # Build accused_user_ids with "<=K and within margin" rule
-                accused_user_ids = []
-                if all_candidates:
-                    best_combined_dist = all_candidates[0][4]
-                    for user_id, group_id, group_dist, user_dist, combined_dist in all_candidates:
-                        if len(accused_user_ids) >= K:
-                            break
-                        if combined_dist <= best_combined_dist + MARGIN:
-                            accused_user_ids.append(user_id)
-                    
-                    # Ensure at least one if candidates exist
-                    if not accused_user_ids and MIN_RETURN == 1:
-                        accused_user_ids = [all_candidates[0][0]]
-                
-                # Calculate Hamming distances for all users (for completeness)
+                # Calculate Hamming distances for all users for completeness
                 hamming_distances = {}
+                all_user_ids = list(range(muw.N))
                 valid_positions = [i for i, c in enumerate(merged_codeword) if c in ('0', '1')]
-                for user_id in range(muw.N):
+                
+                for user_id in all_user_ids:
                     try:
                         user_codeword = muw.get_codeword_for_user(user_id)
                         if valid_positions:
                             hamming_dist = sum(
-                                merged_codeword[i] != user_codeword[i]
+                                merged_codeword[i] != user_codeword[i] 
                                 for i in valid_positions
                             )
                         else:
@@ -553,37 +315,26 @@ def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_
                     except Exception:
                         hamming_distances[user_id] = float('inf')
                 
-                # Store debug info (top few candidates only)
-                top_candidates = [
-                    {
-                        'user_id': user_id,
-                        'group_id': group_id,
-                        'group_dist': group_dist,
-                        'user_dist': user_dist,
-                        'combined_dist': combined_dist
-                    }
-                    for user_id, group_id, group_dist, user_dist, combined_dist in all_candidates[:10]
-                ]
-                
                 return {
-                    'success': bool(set(accused_user_ids) & set(original_user_ids)),
-                    'accused_user_ids': accused_user_ids,
+                    'success': len(matches) > 0,
+                    'accused_user_ids': matches,  # May include non-colluders (false positives)
                     'original_user_ids': original_user_ids,
+                    'matches': matches,
+                    'num_matches': len(matches),
                     'merged_codeword': merged_codeword,
                     'hamming_distances': hamming_distances,
-                    'method': 'hi_dypa_hier_topk_margin',
-                    'K': K,
-                    'MARGIN': MARGIN,
-                    'GROUP_MARGIN': GROUP_MARGIN,
-                    'group_candidates': candidate_groups,
-                    'group_distances': {gid: group_dist_dict[gid] for gid in candidate_groups},
-                    'top_candidates': top_candidates
+                    'method': 'hi_dypa_trace'
                 }
             except Exception as e:
-                # If hi_dypa tracing fails, fall back to naive-style ranking
+                # If hi_dypa tracing fails, fall back to direct matching
                 pass
         
-        # For naive schemes (or if hi_dypa tracing fails), use ranked top list with margin
+        # For naive schemes (or if hi_dypa tracing fails), use direct codeword matching
+        matches = []
+        hamming_distances = {}
+        
+        # Check ALL users (0 to N-1), not just original colluders
+        # This allows us to detect false positives (innocent users incorrectly accused)
         all_user_ids = list(range(muw.N))
         
         # Calculate valid positions once (same for all users)
@@ -592,76 +343,46 @@ def trace_collusion(muw, master_key: bytes, merged_codeword: str, original_user_
             if c in ('0', '1')
         ]
         
-        # PROBLEM 1 FIX: If no valid bits at all, return early with no accusations
-        if len(valid_positions) == 0:
-            # Calculate Hamming distances for all users (for completeness)
-            hamming_distances = {}
-            for user_id in all_user_ids:
-                try:
-                    user_codeword = muw.get_codeword_for_user(user_id)
-                    hamming_distances[user_id] = float('inf')
-                except Exception:
-                    hamming_distances[user_id] = float('inf')
-            
-            return {
-                'success': False,
-                'accused_user_ids': [],
-                'original_user_ids': original_user_ids,
-                'merged_codeword': merged_codeword,
-                'hamming_distances': hamming_distances,
-                'method': 'naive_no_valid_bits',
-                'K': K,
-                'MARGIN': MARGIN,
-                'reason': 'no_valid_bits'
-            }
-        
-        # Compute per-user Hamming distance
-        candidates = []  # List of (user_id, distance)
-        hamming_distances = {}
+        # Adaptive threshold: 25% of valid bits (rounded up to nearest integer)
+        # This adapts to data quality - fewer valid bits means stricter threshold
+        if valid_positions:
+            adaptive_threshold = max(1, int(len(valid_positions) * 0.25 + 0.5))  # Round to nearest, minimum 1
+        else:
+            adaptive_threshold = float('inf')
         
         for user_id in all_user_ids:
             try:
                 user_codeword = muw.get_codeword_for_user(user_id)
                 
-                # Compare only at valid positions
-                dist = sum(
-                    merged_codeword[i] != user_codeword[i] 
-                    for i in valid_positions
-                )
+                if not valid_positions:
+                    # All positions are uncertain, can't match
+                    hamming_dist = float('inf')
+                else:
+                    # Compare only at valid positions
+                    hamming_dist = sum(
+                        merged_codeword[i] != user_codeword[i] 
+                        for i in valid_positions
+                    )
                 
-                hamming_distances[user_id] = dist
-                candidates.append((user_id, dist))
+                hamming_distances[user_id] = hamming_dist
+                
+                # Use adaptive threshold: allow errors up to 25% of valid bits
+                # Also need to check that we have enough valid positions to make a meaningful comparison
+                if len(valid_positions) >= 3 and hamming_dist <= adaptive_threshold:
+                    matches.append(user_id)
             except Exception as e:
                 # If we can't get codeword for a user, skip it
-                hamming_distances[user_id] = float('inf')
                 continue
         
-        # Sort users by distance ascending
-        candidates.sort(key=lambda x: x[1])
-        
-        # Apply margin-based selection: only include candidates within best + MARGIN, capped at K
-        accused_user_ids = []
-        if candidates:
-            best_dist = candidates[0][1]
-            for user_id, dist in candidates:
-                if len(accused_user_ids) >= K:
-                    break
-                if dist <= best_dist + MARGIN:
-                    accused_user_ids.append(user_id)
-            
-            # Ensure at least one if candidates exist
-            if not accused_user_ids and MIN_RETURN == 1:
-                accused_user_ids = [candidates[0][0]]
-        
         return {
-            'success': bool(set(accused_user_ids) & set(original_user_ids)),
-            'accused_user_ids': accused_user_ids,
+            'success': len(matches) > 0,
+            'accused_user_ids': matches,  # May include non-colluders (false positives)
             'original_user_ids': original_user_ids,
+            'matches': matches,
+            'num_matches': len(matches),
             'merged_codeword': merged_codeword,
             'hamming_distances': hamming_distances,
-            'method': 'naive_topk_margin',
-            'K': K,
-            'MARGIN': MARGIN
+            'method': 'direct_codeword_match'
         }
     except Exception as e:
         return {
@@ -1183,18 +904,12 @@ def main():
                     false_positives += len(false_positive_users)
                     prompts_with_false_positives += 1
             
-            # Calculate new metrics: average false accused per prompt and false accuse prompt rate
-            avg_false_accused_per_prompt = (false_positives / total) if total > 0 else 0.0
-            false_accuse_prompt_rate = (prompts_with_false_positives / total) * 100.0 if total > 0 else 0.0
-            
             success_rates_2[case_type] = {
                 'successful': successful,
                 'total': total,
                 'success_rate': (successful / total) * 100.0 if total > 0 else 0.0,
                 'false_positives': false_positives,
-                'false_positive_rate': (prompts_with_false_positives / total) * 100.0 if total > 0 else 0.0,
-                'avg_false_accused_per_prompt': avg_false_accused_per_prompt,
-                'false_accuse_prompt_rate': false_accuse_prompt_rate
+                'false_positive_rate': (prompts_with_false_positives / total) * 100.0 if total > 0 else 0.0
             }
     
     # Calculate success rates and false positives for 3-colluder cases
@@ -1229,18 +944,12 @@ def main():
                     false_positives += len(false_positive_users)
                     prompts_with_false_positives += 1
             
-            # Calculate new metrics: average false accused per prompt and false accuse prompt rate
-            avg_false_accused_per_prompt = (false_positives / total) if total > 0 else 0.0
-            false_accuse_prompt_rate = (prompts_with_false_positives / total) * 100.0 if total > 0 else 0.0
-            
             success_rates_3[case_type] = {
                 'successful': successful,
                 'total': total,
                 'success_rate': (successful / total) * 100.0 if total > 0 else 0.0,
                 'false_positives': false_positives,
-                'false_positive_rate': (prompts_with_false_positives / total) * 100.0 if total > 0 else 0.0,
-                'avg_false_accused_per_prompt': avg_false_accused_per_prompt,
-                'false_accuse_prompt_rate': false_accuse_prompt_rate
+                'false_positive_rate': (prompts_with_false_positives / total) * 100.0 if total > 0 else 0.0
             }
     
     # Save summary JSON for 2 colluders

@@ -1,0 +1,30 @@
+{
+  "scheme": "hi_dypa",
+  "model": "gpt2",
+  "run_tag": "job_8236771",
+  "l_bits": 8,
+  "group_bits": 2,
+  "user_bits": 6,
+  "num_prompts": 300,
+  "random_seed": 519805246,
+  "output_directory": "/fred/oz411/kpham/crypto-watermark/evaluation/collusion_resistance/hi_dypa/G2_U6/job_8236771",
+  "raw_results_file": null,
+  "generated_utc": "2026-01-09T01:21:18.327482Z",
+  "num_colluders": 2,
+  "success_rates": {
+    "same_group_2": {
+      "successful": 297,
+      "total": 300,
+      "success_rate": 99.0,
+      "false_positives": 204,
+      "false_positive_rate": 62.66666666666667
+    },
+    "cross_group_2": {
+      "successful": 300,
+      "total": 300,
+      "success_rate": 100.0,
+      "false_positives": 231,
+      "false_positive_rate": 70.0
+    }
+  }
+}
