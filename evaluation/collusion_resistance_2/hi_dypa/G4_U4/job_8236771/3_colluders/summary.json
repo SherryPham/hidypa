@@ -7,7 +7,7 @@
   "user_bits": 4,
   "num_prompts": 300,
   "random_seed": 564635667,
-  "output_directory": "/fred/oz411/kpham/crypto-watermark/evaluation/collusion_resistance/hi_dypa/G4_U4/job_8236771",
+  "output_directory": "evaluation/collusion_resistance/hi_dypa/G4_U4/job_8236771",
   "raw_results_file": null,
   "generated_utc": "2026-01-09T13:36:18.205740Z",
   "num_colluders": 3,
