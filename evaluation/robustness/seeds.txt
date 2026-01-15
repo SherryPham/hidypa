@@ -1,6 +1,6 @@
 # Random seeds used for user selection in robustness evaluation
 # Model: gpt2
-# Run tag: job_7963207
+# Run tag: results
 # Generated: 2025-12-20 22:52:51
 # Format: config_name: seed_value
 

@@ -1,0 +1,21 @@
+{
+  "scheme": "hi_dypa",
+  "model": "gpt2",
+  "run_tag": "job_7904366",
+  "l_bits": 8,
+  "group_bits": 5,
+  "user_bits": 3,
+  "num_prompts": 300,
+  "random_seed": 797047915,
+  "output_directory": "evaluation/hi_dypa_detection/hi_dypa/G5_U3/results",
+  "raw_results_file": null,
+  "generated_utc": "2025-12-18T04:15:51.903557Z",
+  "metrics": {
+    "group_accuracy": 0.9133333333333333,
+    "user_accuracy": 0.9817518248175182,
+    "full_identity_accuracy": 0.8966666666666666,
+    "lbit_accuracy": 0.8366666666666667,
+    "false_positive_rate": 0.06,
+    "false_negative_rate": 0.043333333333333335
+  }
+}

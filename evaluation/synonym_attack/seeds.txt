@@ -1,6 +1,6 @@
 # Random seeds used for synonym attack evaluation
 # Model: gpt2
-# Run tag: job_7963211
+# Run tag: results
 # Generated: 2025-12-20 23:03:26
 # Format: config_name: seed_value
 

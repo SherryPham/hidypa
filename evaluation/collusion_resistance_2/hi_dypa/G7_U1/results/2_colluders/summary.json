@@ -1,0 +1,30 @@
+{
+  "scheme": "hi_dypa",
+  "model": "gpt2",
+  "run_tag": "job_8236771",
+  "l_bits": 8,
+  "group_bits": 7,
+  "user_bits": 1,
+  "num_prompts": 300,
+  "random_seed": 630565436,
+  "output_directory": "evaluation/collusion_resistance/hi_dypa/G7_U1/results",
+  "raw_results_file": null,
+  "generated_utc": "2026-01-10T07:50:16.671922Z",
+  "num_colluders": 2,
+  "success_rates": {
+    "same_group_2": {
+      "successful": 300,
+      "total": 300,
+      "success_rate": 100.0,
+      "false_positives": 981,
+      "false_positive_rate": 79.0
+    },
+    "cross_group_2": {
+      "successful": 297,
+      "total": 300,
+      "success_rate": 99.0,
+      "false_positives": 961,
+      "false_positive_rate": 74.66666666666667
+    }
+  }
+}
