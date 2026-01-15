@@ -1,7 +1,7 @@
 {
   "scheme": "naive",
   "model": "gpt2",
-  "run_tag": "job_7963209",
+  "run_tag": "results",
   "l_bits": 8,
   "group_bits": null,
   "user_bits": null,

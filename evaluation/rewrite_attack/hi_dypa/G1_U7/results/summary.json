@@ -1,7 +1,7 @@
 {
   "scheme": "hi_dypa",
   "model": "gpt2",
-  "run_tag": "job_8104043",
+  "run_tag": "results",
   "l_bits": 8,
   "group_bits": 1,
   "user_bits": 7,

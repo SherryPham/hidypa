@@ -19,7 +19,7 @@
     "random"
   ],
   "model": "gpt2",
-  "run_tag": "job_7963207",
+  "run_tag": "results",
   "random_seed": 1132714037,
   "output_directory": "evaluation/robustness/hi_dypa/G8_U0/results",
   "raw_results_file": null,
