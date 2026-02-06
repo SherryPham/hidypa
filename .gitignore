@@ -26,3 +26,4 @@ COMMANDS.md
 test_evaluation/
 helper_scripts/anonymize_evaluation_paths.py
 evaluation_scripts_local/
+demo_backup/
