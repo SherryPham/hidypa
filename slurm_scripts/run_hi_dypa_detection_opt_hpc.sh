@@ -18,6 +18,9 @@
 # =============================================================================
 # Environment setup
 # =============================================================================
+module --force purge
+module load singularity
+
 CODE_DIR="/home/trpham/hidypa"
 SIF="/fred/oz411/trpham/hidypa.sif"
 HF_CACHE="/fred/oz411/trpham/hf_cache"
