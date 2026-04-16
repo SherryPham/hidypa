@@ -20,20 +20,8 @@ current_dir = os.path.dirname(__file__)
 parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
 sys.path.insert(0, parent_dir)
 
-from src.models import GPT2Model, GptOssModel, GptOss120bModel
 from src.watermark import ZeroBitWatermarker, LBitWatermarker, NaiveMultiUserWatermarker, HiDyPaMultiUserWatermarker
-
-
-def get_model(model_name: str):
-    """Function to instantiate the correct model based on its name."""
-    if model_name == 'gpt2':
-        return GPT2Model()
-    elif model_name == 'gpt-oss-20b':
-        return GptOssModel()
-    elif model_name == 'gpt-oss-120b':
-        return GptOss120bModel()
-    else:
-        raise ValueError(f"Unknown model name: {model_name}")
+from src.utils import get_model
 
 
 def get_memory_mb():
@@ -428,7 +416,9 @@ def main():
         '--model',
         type=str,
         default='gpt2',
-        choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b'],
+        choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b',
+                 'llama-3.2-1b', 'llama-3.2-3b', 'llama-3.1-8b',
+                 'opt-125m', 'opt-1.3b', 'opt-2.7b', 'opt-6.7b'],
         help='Model to use for generation and detection'
     )
     parser.add_argument(

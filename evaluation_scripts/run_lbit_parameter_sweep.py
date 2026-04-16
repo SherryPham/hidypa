@@ -83,7 +83,9 @@ def main():
         '--model',
         type=str,
         default='gpt2',
-        choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b'],
+        choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b',
+                 'llama-3.2-1b', 'llama-3.2-3b', 'llama-3.1-8b',
+                 'opt-125m', 'opt-1.3b', 'opt-2.7b', 'opt-6.7b'],
         help='Model to use for generation and detection'
     )
     parser.add_argument(

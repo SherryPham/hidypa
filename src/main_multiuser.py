@@ -9,7 +9,7 @@ import sys
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.models import GPT2Model, GptOssModel, GptOss120bModel
+from src.models import GPT2Model, GptOssModel, GptOss120bModel, LlamaModel, LLAMA_MODEL_IDS
 from src.watermark import (
     ZeroBitWatermarker,
     LBitWatermarker,
@@ -40,6 +40,8 @@ def get_model(model_name: str):
         return GptOssModel()
     elif model_name == 'gpt-oss-120b':
         return GptOss120bModel()
+    elif model_name in LLAMA_MODEL_IDS or model_name.startswith('meta-llama/'):
+        return LlamaModel(model_name)
     else:
         raise ValueError(f"Unknown model name: {model_name}")
 
@@ -50,7 +52,10 @@ def main():
     # --- Base arguments for both commands ---
     base_parser = argparse.ArgumentParser(add_help=False)
     base_parser.add_argument('--users-file', type=str, default='assets/users.csv', help="Path to the user metadata CSV file.")
-    base_parser.add_argument('--model', type=str, default='gpt2', choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b'])
+    base_parser.add_argument('--model', type=str, default='gpt2',
+                             choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b',
+                                      'llama-3.2-1b', 'llama-3.2-3b', 'llama-3.1-8b',
+                                      'opt-125m', 'opt-1.3b', 'opt-2.7b', 'opt-6.7b'])
     base_parser.add_argument('--key-file', '-k', type=str, default='demonstration/multiuser_master.key', help="Path to the master secret key.")
     # L-bit parameters
     base_parser.add_argument('--delta', type=float, default=3.5)

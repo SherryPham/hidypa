@@ -6,7 +6,7 @@ import re
 import nltk
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-from src.models import GPT2Model, GptOssModel, GptOss120bModel
+from src.models import GPT2Model, GptOssModel, GptOss120bModel, LlamaModel, LLAMA_MODEL_IDS, OPTModel, OPT_MODEL_IDS
 
 
 def get_model(model_name: str):
@@ -17,6 +17,10 @@ def get_model(model_name: str):
         return GptOssModel()
     elif model_name == 'gpt-oss-120b':
         return GptOss120bModel()
+    elif model_name in LLAMA_MODEL_IDS or model_name.startswith('meta-llama/'):
+        return LlamaModel(model_name)
+    elif model_name in OPT_MODEL_IDS or model_name.startswith('facebook/opt'):
+        return OPTModel(model_name)
     else:
         raise ValueError(f"Unknown model name: {model_name}")
 

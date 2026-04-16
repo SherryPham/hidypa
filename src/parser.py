@@ -86,7 +86,9 @@ def build_parser():
     parser_gen = subparsers.add_parser('generate', help='Generate and watermark text.')
     parser_gen.add_argument('prompt', type=str, help='The prompt to send to the model.')
     parser_gen.add_argument('--model', type=str, default='gpt2',
-                            choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b'],
+                            choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b',
+                                     'llama-3.2-1b', 'llama-3.2-3b', 'llama-3.1-8b',
+                                     'opt-125m', 'opt-1.3b', 'opt-2.7b', 'opt-6.7b'],
                             help='The model to use for generation.')
     parser_gen.add_argument('--max-new-tokens', type=int, default=2048, help='Maximum number of new tokens to generate.')
     parser_gen.add_argument('--output-file', '-o', type=str, default='demonstration/watermarked_output.txt',
@@ -102,7 +104,9 @@ def build_parser():
     parser_detect = subparsers.add_parser('detect', help='Detect a watermark in a text file.')
     parser_detect.add_argument('input_file', type=str, help='Path to the text file to check.')
     parser_detect.add_argument('--model', type=str, required=True,
-                                choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b'],
+                                choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b',
+                                         'llama-3.2-1b', 'llama-3.2-3b', 'llama-3.1-8b',
+                                     'opt-125m', 'opt-1.3b', 'opt-2.7b', 'opt-6.7b'],
                                 help='The model that was used to generate the text (for tokenizer matching).')
     parser_detect.add_argument('--key-file', '-k', type=str, default='demonstration/secret.key',
                                 help='Path to the secret key file.')
@@ -116,7 +120,11 @@ def build_parser():
     parser_eval.add_argument('--prompts-file', type=str, required=True, help='Path to a .txt file with one prompt per line.')
     parser_eval.add_argument('--max-prompts', type=int, default=100,
                              help='How many prompts to evaluate (default: 100; set <=0 to use all).')
-    parser_eval.add_argument('--model', type=str, default='gpt2', choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b'], help='Model to use for generation.')
+    parser_eval.add_argument('--model', type=str, default='gpt2',
+                             choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b',
+                                      'llama-3.2-1b', 'llama-3.2-3b', 'llama-3.1-8b',
+                                     'opt-125m', 'opt-1.3b', 'opt-2.7b', 'opt-6.7b'],
+                             help='Model to use for generation.')
     parser_eval.add_argument('--output-dir', type=str, default='evaluation/evaluation_results', help='Directory to save all generated texts and results.')
     parser_eval.add_argument('--max-new-tokens', type=int, default=2048, help='Tokens to generate for each prompt.')
     parser_eval.add_argument('--z-threshold', type=float, default=4.0, help='The z-score threshold for detection.')
@@ -128,7 +136,10 @@ def build_parser():
     parser_lgen.add_argument('prompt', type=str, help='The prompt to send to the model.')
     parser_lgen.add_argument('--message', type=str, required=True, help='L-bit binary message (e.g., "0101...").')
     parser_lgen.add_argument('--l-bits', type=int, default=32, help='Number of bits for the message.')
-    parser_lgen.add_argument('--model', type=str, default='gpt2', choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b'],
+    parser_lgen.add_argument('--model', type=str, default='gpt2',
+                            choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b',
+                                     'llama-3.2-1b', 'llama-3.2-3b', 'llama-3.1-8b',
+                                     'opt-125m', 'opt-1.3b', 'opt-2.7b', 'opt-6.7b'],
                             help='The model to use for generation.')
     parser_lgen.add_argument('--max-new-tokens', type=int, default=512, help='Maximum number of new tokens to generate.')
     parser_lgen.add_argument('--output-file', '-o', type=str, default='demonstration/watermarked_lbit.txt', help='File to save the generated text.')
@@ -142,7 +153,10 @@ def build_parser():
     parser_ldet = subparsers.add_parser('detect_lbit', help='Detect L-bit message in text.')
     parser_ldet.add_argument('input_file', type=str, help='Path to the text file to check.')
     parser_ldet.add_argument('--l-bits', type=int, default=32, help='Number of bits for the message.')
-    parser_ldet.add_argument('--model', type=str, required=True, choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b'],
+    parser_ldet.add_argument('--model', type=str, required=True,
+                            choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b',
+                                     'llama-3.2-1b', 'llama-3.2-3b', 'llama-3.1-8b',
+                                     'opt-125m', 'opt-1.3b', 'opt-2.7b', 'opt-6.7b'],
                             help='The model that was used to generate the text (for tokenizer matching).')
     parser_ldet.add_argument('--key-file', type=str, default='demonstration/secret_lbit.key', help='Path to the secret key file.')
     parser_ldet.add_argument('--delta', type=check_delta_range, default=3.5, help='Watermark bias strength used during generation (1.0 to 5.0).')
