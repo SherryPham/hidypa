@@ -25,7 +25,6 @@ HF_CACHE="/fred/oz411/trpham/hf_cache"
 export HF_HOME=${HF_CACHE}
 export HF_HUB_CACHE=${HF_CACHE}
 export TRANSFORMERS_CACHE=${HF_CACHE}
-export NLTK_DATA=${HF_CACHE}/nltk_data
 export TRANSFORMERS_OFFLINE=1
 export HF_HUB_OFFLINE=1
 
@@ -40,7 +39,6 @@ APPTAINER_RUN="apptainer exec --nv \
     --env HF_HOME=${HF_CACHE} \
     --env HF_HUB_CACHE=${HF_CACHE} \
     --env TRANSFORMERS_CACHE=${HF_CACHE} \
-    --env NLTK_DATA=${HF_CACHE}/nltk_data \
     --env TRANSFORMERS_OFFLINE=1 \
     --env HF_HUB_OFFLINE=1 \
     ${SIF}"
