@@ -19,7 +19,7 @@
 # Environment setup
 # =============================================================================
 module --force purge
-module load singularity
+module load apptainer
 
 CODE_DIR="/home/trpham/hidypa"
 SIF="/fred/oz411/trpham/hidypa.sif"
