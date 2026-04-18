@@ -140,8 +140,13 @@ def decode_hi_dypa_user(muw, recovered_codeword: str, true_user_id: int = None) 
     
     # Get true group ID if true_user_id is provided
     true_group_id = None
-    if true_user_id is not None and hasattr(muw, 'user_to_group'):
-        true_group_id = muw.user_to_group.get(true_user_id)
+    if true_user_id is not None:
+        if hasattr(muw, 'user_to_group') and isinstance(muw.user_to_group, dict):
+            true_group_id = muw.user_to_group.get(true_user_id)
+        elif hasattr(muw, 'user_metadata') and hasattr(muw, '_users_per_group') and muw._users_per_group > 0:
+            user_row = muw.user_metadata[muw.user_metadata['UserId'] == true_user_id]
+            if not user_row.empty:
+                true_group_id = int(user_row.index[0]) // muw._users_per_group
     
     # Split recovered bits
     recovered_group_bits = recovered_codeword[:muw.group_bits]
@@ -170,7 +175,10 @@ def decode_hi_dypa_user(muw, recovered_codeword: str, true_user_id: int = None) 
         return None, None, true_group_id
     
     # User identification: find nearest user fingerprint within the identified group
-    users_in_group = muw.group_to_users.get(best_group_id, [])
+    if isinstance(muw.group_to_users, dict):
+        users_in_group = muw.group_to_users.get(best_group_id, [])
+    else:
+        users_in_group = muw.group_to_users[best_group_id] if best_group_id < len(muw.group_to_users) else []
     if not users_in_group:
         return best_group_id, None, true_group_id
     
