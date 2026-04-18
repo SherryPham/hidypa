@@ -156,7 +156,8 @@ def decode_hi_dypa_user(muw, recovered_codeword: str, true_user_id: int = None) 
     if not valid_group_positions:
         return None, None, true_group_id
     
-    for group_id, group_codeword in muw.group_codewords.items():
+    for group_id in range(muw._num_groups):
+        group_codeword = muw._get_group_codeword_str(group_id)
         distance = sum(
             recovered_group_bits[i] != group_codeword[i]
             for i in valid_group_positions
