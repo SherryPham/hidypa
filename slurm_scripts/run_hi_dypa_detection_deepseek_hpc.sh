@@ -24,10 +24,11 @@ module load apptainer
 CODE_DIR="/home/trpham/hidypa"
 SIF="/fred/oz411/trpham/hidypa.sif"
 HF_CACHE="/fred/oz411/trpham/hf_cache"
+HF_HUB="/fred/oz411/trpham/hf_cache/hub"
 
 export HF_HOME=${HF_CACHE}
-export HF_HUB_CACHE=${HF_CACHE}
-export TRANSFORMERS_CACHE=${HF_CACHE}
+export HF_HUB_CACHE=${HF_HUB}
+export TRANSFORMERS_CACHE=${HF_HUB}
 export TRANSFORMERS_OFFLINE=1
 export HF_HUB_OFFLINE=1
 
@@ -39,8 +40,8 @@ APPTAINER_RUN="apptainer exec --nv \
     --bind ${CODE_DIR}:/workspace \
     --bind ${HF_CACHE}:${HF_CACHE} \
     --env HF_HOME=${HF_CACHE} \
-    --env HF_HUB_CACHE=${HF_CACHE} \
-    --env TRANSFORMERS_CACHE=${HF_CACHE} \
+    --env HF_HUB_CACHE=${HF_HUB} \
+    --env TRANSFORMERS_CACHE=${HF_HUB} \
     --env TRANSFORMERS_OFFLINE=1 \
     --env HF_HUB_OFFLINE=1 \
     ${SIF}"

@@ -181,10 +181,14 @@ def decode_hi_dypa_user(muw, recovered_codeword: str, true_user_id: int = None) 
         users_in_group = muw.group_to_users[best_group_id] if best_group_id < len(muw.group_to_users) else []
     if not users_in_group:
         return best_group_id, None, true_group_id
-    
-    valid_user_positions = [i for i, bit in enumerate(recovered_user_bits) 
+
+    # Group-only mode: U=0 means each group has exactly one user; detecting the group = detecting the user
+    if muw.user_bits == 0:
+        return best_group_id, users_in_group[0], true_group_id
+
+    valid_user_positions = [i for i, bit in enumerate(recovered_user_bits)
                            if bit not in ('⊥', '*', '?')]
-    
+
     if not valid_user_positions:
         return best_group_id, None, true_group_id
     
