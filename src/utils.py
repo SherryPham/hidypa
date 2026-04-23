@@ -6,7 +6,7 @@ import re
 import nltk
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-from src.models import GPT2Model, GptOssModel, GptOss120bModel, LlamaModel, LLAMA_MODEL_IDS, OPTModel, OPT_MODEL_IDS
+from src.models import GPT2Model, GptOssModel, GptOss120bModel, LlamaModel, LLAMA_MODEL_IDS, OPTModel, OPT_MODEL_IDS, DeepSeekModel, DEEPSEEK_MODEL_IDS
 
 
 def get_model(model_name: str):
@@ -21,6 +21,8 @@ def get_model(model_name: str):
         return LlamaModel(model_name)
     elif model_name in OPT_MODEL_IDS or model_name.startswith('facebook/opt'):
         return OPTModel(model_name)
+    elif model_name in DEEPSEEK_MODEL_IDS or model_name.startswith('deepseek-ai/'):
+        return DeepSeekModel(model_name)
     else:
         raise ValueError(f"Unknown model name: {model_name}")
 

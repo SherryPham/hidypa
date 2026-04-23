@@ -205,6 +205,56 @@ class OPTModel(LanguageModel):
         return self._device
 
 
+DEEPSEEK_MODEL_IDS = {
+    'deepseek-llm-7b': 'deepseek-ai/deepseek-llm-7b-base',
+}
+
+
+class DeepSeekModel(LanguageModel):
+    """A concrete implementation for DeepSeek LLM models."""
+    def __init__(self, model_name: str):
+        hf_model_id = DEEPSEEK_MODEL_IDS.get(model_name, model_name)
+        print(f"Loading {hf_model_id}. This may take a while...")
+
+        self._torch_dtype = (
+            torch.bfloat16
+            if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+            else torch.float32
+        )
+        self._model = AutoModelForCausalLM.from_pretrained(
+            hf_model_id,
+            torch_dtype=self._torch_dtype,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            hf_model_id,
+            trust_remote_code=True,
+        )
+
+        if self._tokenizer.pad_token is None:
+            self._tokenizer.pad_token = self._tokenizer.eos_token
+
+        self._device = self._model.device
+
+    def get_logits(self, token_ids):
+        with torch.no_grad():
+            outputs = self._model(token_ids)
+            return outputs.logits[:, -1, :]
+
+    @property
+    def tokenizer(self):
+        return self._tokenizer
+
+    @property
+    def vocab_size(self):
+        return self._model.config.vocab_size
+
+    @property
+    def device(self):
+        return self._device
+
+
 # Mapping from CLI shorthand to HuggingFace model ID
 LLAMA_MODEL_IDS = {
     'llama-3.2-1b': 'meta-llama/Llama-3.2-1B',
