@@ -83,82 +83,67 @@ def merge_codewords_bitwise_majority(codewords: list[str]) -> str:
     return "".join(merged)
 
 
+def _build_group_to_users(muw) -> dict | None:
+    """
+    Build a {group_id: [user_ids]} dict from the watermarker's group_to_users attribute.
+    Returns None for the naive scheme, which has no group structure.
+    group_to_users is stored as a list on HiDyPaMultiUserWatermarker, so we convert it here.
+    """
+    if not hasattr(muw, 'group_to_users'):
+        return None
+    if isinstance(muw.group_to_users, list):
+        return {i: list(users) for i, users in enumerate(muw.group_to_users)}
+    return dict(muw.group_to_users)
+
+
 def sample_same_group(muw, k: int) -> list[int]:
     """
     Sample k users from the same group (for Hi-DyPa scheme).
     For naive scheme, just sample k random users.
-    
+
     Args:
         muw: Multi-user watermarker instance
         k: Number of users to sample
-    
+
     Returns:
         List of user IDs
     """
-    if not hasattr(muw, 'user_to_group') or muw.user_to_group is None:
-        # Naive scheme: all users are independent
+    group_to_users = _build_group_to_users(muw)
+    if group_to_users is None:
+        # Naive scheme: all users are independent, group structure does not apply
         return sorted(random.sample(range(muw.N), k))
-    
-    # Hi-DyPa scheme: pick a random group and sample k users from it
-    # Get all groups and their users
-    group_to_users = {}
-    for user_id, group_id in muw.user_to_group.items():
-        if group_id not in group_to_users:
-            group_to_users[group_id] = []
-        group_to_users[group_id].append(user_id)
-    
-    # Find groups with at least k users
+
     valid_groups = [gid for gid, users in group_to_users.items() if len(users) >= k]
-    
     if not valid_groups:
         raise ValueError(f"No group has at least {k} users")
-    
-    # Pick a random group
+
     selected_group = random.choice(valid_groups)
-    group_users = group_to_users[selected_group]
-    
-    # Sample k users from this group
-    return sorted(random.sample(group_users, k))
+    return sorted(random.sample(group_to_users[selected_group], k))
 
 
 def sample_different_groups(muw, k: int) -> list[int]:
     """
     Sample k users from k different groups (for Hi-DyPa scheme).
     For naive scheme, just sample k random users (since all are independent).
-    
+
     Args:
         muw: Multi-user watermarker instance
         k: Number of users to sample
-    
+
     Returns:
         List of user IDs
     """
-    if not hasattr(muw, 'user_to_group') or muw.user_to_group is None:
-        # Naive scheme: all users are independent
+    group_to_users = _build_group_to_users(muw)
+    if group_to_users is None:
+        # Naive scheme: all users are independent, group structure does not apply
         return sorted(random.sample(range(muw.N), k))
-    
-    # Hi-DyPa scheme: pick k different groups
-    # Get all groups
-    group_to_users = {}
-    for user_id, group_id in muw.user_to_group.items():
-        if group_id not in group_to_users:
-            group_to_users[group_id] = []
-        group_to_users[group_id].append(user_id)
-    
+
     available_groups = list(group_to_users.keys())
-    
     if len(available_groups) < k:
         raise ValueError(f"Only {len(available_groups)} groups available, need {k} different groups")
-    
-    # Pick k different groups
+
     selected_groups = random.sample(available_groups, k)
-    
-    # Pick one user from each group
-    selected_users = []
-    for group_id in selected_groups:
-        group_users = group_to_users[group_id]
-        selected_users.append(random.choice(group_users))
-    
+    selected_users = [random.choice(group_to_users[gid]) for gid in selected_groups]
     return sorted(selected_users)
 
 
@@ -166,50 +151,39 @@ def sample_2_same_1_diff(muw) -> list[int]:
     """
     Sample 2 users from the same group and 1 user from a different group.
     For naive scheme, just sample 3 random users (since all are independent).
-    
+
     Args:
         muw: Multi-user watermarker instance
-    
+
     Returns:
         List of 3 user IDs
     """
-    if not hasattr(muw, 'user_to_group') or muw.user_to_group is None:
-        # Naive scheme: all users are independent
+    group_to_users = _build_group_to_users(muw)
+    if group_to_users is None:
+        # Naive scheme: all users are independent, group structure does not apply
         return sorted(random.sample(range(muw.N), 3))
-    
-    # Hi-DyPa scheme: pick 2 from one group, 1 from another
-    # Get all groups
-    group_to_users = {}
-    for user_id, group_id in muw.user_to_group.items():
-        if group_id not in group_to_users:
-            group_to_users[group_id] = []
-        group_to_users[group_id].append(user_id)
-    
-    # Find groups with at least 2 users
+
     valid_groups = [gid for gid, users in group_to_users.items() if len(users) >= 2]
-    
     if len(valid_groups) < 2:
         raise ValueError("Need at least 2 groups, with at least one having 2+ users")
-    
-    # Pick a group for the 2 users
+
     group_with_2 = random.choice(valid_groups)
     users_from_group = random.sample(group_to_users[group_with_2], 2)
-    
-    # Pick a different group for the 1 user
+
     other_groups = [gid for gid in group_to_users.keys() if gid != group_with_2]
     other_group = random.choice(other_groups)
     user_from_other = random.choice(group_to_users[other_group])
-    
+
     return sorted(users_from_group + [user_from_other])
 
 
 def get_group_info(muw) -> dict:
     """
     Get information about available groups for the multi-user watermarker.
-    
+
     Args:
         muw: Multi-user watermarker instance
-    
+
     Returns:
         Dictionary with group information including:
         - num_groups: Number of distinct groups
@@ -218,33 +192,23 @@ def get_group_info(muw) -> dict:
         - can_run_cross_group_3: Whether 3-colluder cross-group case can run
         - can_run_mixed: Whether mixed 2same_1diff case can run
     """
-    if not hasattr(muw, 'user_to_group') or muw.user_to_group is None:
-        # Naive scheme: all users are independent, all cases can run
+    group_to_users = _build_group_to_users(muw)
+    if group_to_users is None:
+        # Naive scheme: all users are independent, all collusion cases can run
         return {
-            'num_groups': None,  # Not applicable for naive
+            'num_groups': None,
             'group_to_users': None,
             'can_run_cross_group_2': True,
             'can_run_cross_group_3': True,
             'can_run_mixed': True
         }
-    
-    # Hi-DyPa scheme: analyze groups
-    group_to_users = {}
-    for user_id, group_id in muw.user_to_group.items():
-        if group_id not in group_to_users:
-            group_to_users[group_id] = []
-        group_to_users[group_id].append(user_id)
-    
+
     num_groups = len(group_to_users)
-    
-    # Check which cases can run
     can_run_cross_group_2 = num_groups >= 2
     can_run_cross_group_3 = num_groups >= 3
-    
-    # For mixed case: need at least 2 groups, with at least one having 2+ users
     groups_with_2plus = [gid for gid, users in group_to_users.items() if len(users) >= 2]
     can_run_mixed = num_groups >= 2 and len(groups_with_2plus) >= 1
-    
+
     return {
         'num_groups': num_groups,
         'group_to_users': group_to_users,
@@ -497,7 +461,8 @@ def main():
         default='gpt2',
         choices=['gpt2', 'gpt-oss-20b', 'gpt-oss-120b',
                  'llama-3.2-1b', 'llama-3.2-3b', 'llama-3.1-8b',
-                 'opt-125m', 'opt-1.3b', 'opt-2.7b', 'opt-6.7b'],
+                 'opt-125m', 'opt-1.3b', 'opt-2.7b', 'opt-6.7b',
+                 'deepseek-llm-7b'],
         help='Model to use for generation and detection'
     )
     parser.add_argument(
