@@ -205,8 +205,15 @@ def decode_hi_dypa_user(
         return None, None, None
 
     true_group_id = None
-    if true_user_id is not None and hasattr(muw, "user_to_group"):
-        true_group_id = muw.user_to_group.get(true_user_id)
+    if true_user_id is not None:
+        try:
+            user_row_index = next(
+                i for i, row in enumerate(muw.user_metadata)
+                if row["user_id"] == true_user_id
+            )
+            true_group_id = user_row_index // muw._users_per_group
+        except (StopIteration, AttributeError, KeyError):
+            pass
 
     recovered_group_bits = recovered_codeword[: muw.group_bits]
     recovered_user_bits = recovered_codeword[muw.group_bits :]
@@ -220,7 +227,8 @@ def decode_hi_dypa_user(
     if not valid_group_positions:
         return None, None, true_group_id
 
-    for group_id, group_codeword in muw.group_codewords.items():
+    for group_id in range(muw._num_groups):
+        group_codeword = muw._get_group_codeword_str(group_id)
         distance = sum(
             recovered_group_bits[i] != group_codeword[i] for i in valid_group_positions
         )
@@ -231,9 +239,15 @@ def decode_hi_dypa_user(
     if best_group_id is None:
         return None, None, true_group_id
 
-    users_in_group = muw.group_to_users.get(best_group_id, [])
+    if isinstance(muw.group_to_users, dict):
+        users_in_group = muw.group_to_users.get(best_group_id, [])
+    else:
+        users_in_group = muw.group_to_users[best_group_id] if best_group_id < len(muw.group_to_users) else []
     if not users_in_group:
         return best_group_id, None, true_group_id
+
+    if muw.user_bits == 0:
+        return best_group_id, users_in_group[0], true_group_id
 
     valid_user_positions = [
         i for i, bit in enumerate(recovered_user_bits) if bit not in ("⊥", "*", "?")
@@ -577,7 +591,9 @@ def main():
         type=str,
         default="gpt2",
         choices=["gpt2", "gpt-oss-20b", "gpt-oss-120b",
-                 "llama-3.2-1b", "llama-3.2-3b", "llama-3.1-8b"],
+                 "llama-3.2-1b", "llama-3.2-3b", "llama-3.1-8b",
+                 "deepseek-llm-7b",
+                 "opt-125m", "opt-350m", "opt-1.3b", "opt-2.7b", "opt-6.7b"],
         help="Model to use for generation and detection",
     )
     parser.add_argument(
