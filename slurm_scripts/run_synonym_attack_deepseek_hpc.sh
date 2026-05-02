@@ -25,7 +25,7 @@ CODE_DIR="/home/trpham/hidypa"
 SIF="/fred/oz411/trpham/hidypa.sif"
 HF_CACHE="/fred/oz411/trpham/hf_cache"
 HF_HUB="/fred/oz411/trpham/hf_cache/hub"
-NLTK_DIR="/fred/oz411/trpham/hf_cache/nltk_data"
+NLTK_DIR="/home/trpham/nltk_data"
 
 export HF_HOME=${HF_CACHE}
 export HF_HUB_CACHE=${HF_HUB}
