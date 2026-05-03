@@ -68,11 +68,17 @@ def apply_synonym_substitution(text: str, ratio: float = 0.1, mode: str = "rando
 
     for idx in indices:
         word = tokens[idx]
-        synsets = wordnet.synsets(word)
-        if synsets:
-            lemmas = synsets[0].lemma_names()
-            if lemmas:
-                tokens[idx] = lemmas[0].replace("_", " ")
+        replacement = None
+        for synset in wordnet.synsets(word):
+            for lemma in synset.lemma_names():
+                candidate = lemma.replace("_", " ")
+                if candidate.lower() != word.lower():
+                    replacement = candidate
+                    break
+            if replacement:
+                break
+        if replacement:
+            tokens[idx] = replacement
 
     return " ".join(tokens)
 
