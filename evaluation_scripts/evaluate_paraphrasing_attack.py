@@ -207,12 +207,10 @@ def decode_hi_dypa_user(
     true_group_id = None
     if true_user_id is not None:
         try:
-            user_row_index = next(
-                i for i, row in enumerate(muw.user_metadata)
-                if row["user_id"] == true_user_id
-            )
-            true_group_id = user_row_index // muw._users_per_group
-        except (StopIteration, AttributeError, KeyError):
+            user_row = muw.user_metadata[muw.user_metadata['UserId'] == true_user_id]
+            if not user_row.empty:
+                true_group_id = user_row.index[0] // muw._users_per_group
+        except (AttributeError, KeyError, IndexError, TypeError):
             pass
 
     recovered_group_bits = recovered_codeword[: muw.group_bits]

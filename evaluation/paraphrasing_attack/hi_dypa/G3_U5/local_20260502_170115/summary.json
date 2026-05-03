@@ -1,0 +1,39 @@
+{
+  "scheme": "hi_dypa",
+  "model": "deepseek-llm-7b",
+  "run_tag": "local_20260502_170115",
+  "l_bits": 8,
+  "group_bits": 3,
+  "user_bits": 5,
+  "num_prompts": 300,
+  "num_attack_variants_per_prompt": 16,
+  "total_attack_results": 0,
+  "paraphrase_ratios": [
+    0.05,
+    0.1,
+    0.15,
+    0.2
+  ],
+  "paraphrase_modes": [
+    "start",
+    "middle",
+    "end",
+    "random"
+  ],
+  "random_seed": 1770783232,
+  "output_directory": "C:\\Users\\pham thu\\hi-dypa\\hidypa\\evaluation/paraphrasing_attack\\hi_dypa\\G3_U5\\local_20260502_170115",
+  "raw_results_file": null,
+  "generated_utc": "2026-05-02T17:57:49.206349Z",
+  "metrics": {
+    "group_accuracy": 0.0,
+    "user_accuracy": 0.0,
+    "full_identity_accuracy": 0.0,
+    "lbit_accuracy": 0.0,
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.0,
+    "avg_invalid_symbols": 0.0,
+    "avg_hamming_distance": 0.0,
+    "avg_z_score": 0.0
+  },
+  "metrics_by_variant": {}
+}
