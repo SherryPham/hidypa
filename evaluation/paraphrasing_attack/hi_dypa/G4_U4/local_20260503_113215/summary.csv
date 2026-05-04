@@ -1,0 +1,10 @@
+metric,value
+group_accuracy,0.6129166666666667
+user_accuracy,0.6427600271923861
+full_identity_accuracy,0.39395833333333335
+lbit_accuracy,0.21229166666666666
+false_positive_rate,0.32354166666666667
+false_negative_rate,0.2825
+avg_invalid_symbols,3.5395833333333333
+avg_hamming_distance,0.008361204013377926
+avg_z_score,4.104933042755574
