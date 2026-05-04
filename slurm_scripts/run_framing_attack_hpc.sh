@@ -18,8 +18,7 @@
 # =============================================================================
 # Load HPC-specific paths from config file
 # =============================================================================
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../config/hpc_paths.sh"
+source "${SLURM_SUBMIT_DIR}/config/hpc_paths.sh"
 
 module --force purge
 module load apptainer
