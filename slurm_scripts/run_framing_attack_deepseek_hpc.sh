@@ -1,17 +1,17 @@
 #!/bin/bash
 
 # =============================================================================
-# SLURM Job Configuration — Framing attack resistance (GPT-2, OzSTAR)
+# SLURM Job Configuration — Framing attack resistance (DeepSeek-7B, OzSTAR)
 # =============================================================================
-#SBATCH --job-name=framing_attack
+#SBATCH --job-name=framing_attack_deepseek
 #SBATCH --account=oz411
 #SBATCH -p milan-gpu
 #SBATCH --gres=gpu:1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
-#SBATCH --time=08:00:00
+#SBATCH --mem=64G
+#SBATCH --time=48:00:00
 #SBATCH --output=/home/trpham/hidypa/slurm_out/slurm-%j.out
 
 # =============================================================================
@@ -47,7 +47,7 @@ APPTAINER_RUN="apptainer exec --nv \
 
 RUN_TAG=${RUN_TAG:-job_${SLURM_JOB_ID:-$(date +%Y%m%d_%H%M%S)}}
 echo "Using run tag: ${RUN_TAG}"
-echo "Running framing attack resistance evaluation for all 8 configurations (GPT-2)..."
+echo "Running framing attack resistance evaluation for all 8 configurations (DeepSeek-7B)..."
 echo "L = 8 for all configurations"
 echo ""
 
@@ -60,7 +60,7 @@ echo "=========================================="
 ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.py \
     --scheme naive \
     --l-bits 8 \
-    --model gpt2 \
+    --model deepseek-llm-7b \
     --delta 3.5 \
     --entropy-threshold 2.5 \
     --hashing-context 5 \
@@ -86,7 +86,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --group-bits 1 \
     --user-bits 7 \
     --l-bits 8 \
-    --model gpt2 \
+    --model deepseek-llm-7b \
     --delta 3.5 \
     --entropy-threshold 2.5 \
     --hashing-context 5 \
@@ -112,7 +112,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --group-bits 2 \
     --user-bits 6 \
     --l-bits 8 \
-    --model gpt2 \
+    --model deepseek-llm-7b \
     --delta 3.5 \
     --entropy-threshold 2.5 \
     --hashing-context 5 \
@@ -138,7 +138,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --group-bits 3 \
     --user-bits 5 \
     --l-bits 8 \
-    --model gpt2 \
+    --model deepseek-llm-7b \
     --delta 3.5 \
     --entropy-threshold 2.5 \
     --hashing-context 5 \
@@ -164,7 +164,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --group-bits 4 \
     --user-bits 4 \
     --l-bits 8 \
-    --model gpt2 \
+    --model deepseek-llm-7b \
     --delta 3.5 \
     --entropy-threshold 2.5 \
     --hashing-context 5 \
@@ -190,7 +190,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --group-bits 5 \
     --user-bits 3 \
     --l-bits 8 \
-    --model gpt2 \
+    --model deepseek-llm-7b \
     --delta 3.5 \
     --entropy-threshold 2.5 \
     --hashing-context 5 \
@@ -216,7 +216,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --group-bits 6 \
     --user-bits 2 \
     --l-bits 8 \
-    --model gpt2 \
+    --model deepseek-llm-7b \
     --delta 3.5 \
     --entropy-threshold 2.5 \
     --hashing-context 5 \
@@ -242,7 +242,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --group-bits 7 \
     --user-bits 1 \
     --l-bits 8 \
-    --model gpt2 \
+    --model deepseek-llm-7b \
     --delta 3.5 \
     --entropy-threshold 2.5 \
     --hashing-context 5 \
