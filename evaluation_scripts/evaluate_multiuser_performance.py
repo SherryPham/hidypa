@@ -120,18 +120,16 @@ def measure_initialization(muw, users_file: str, scheme_name: str) -> dict:
     storage_mb = 0
     num_groups = 0
     users_per_group = 0
-    
-    # Hi-DyPa scheme: store group codewords
-    if hasattr(muw, 'group_codewords') and muw.group_codewords:
+
+    # Hi-DyPa scheme: group codewords are lazy-loaded (only generated on first access).
+    # Force-generate all of them now so we can measure actual storage.
+    if hasattr(muw, '_num_groups') and muw._num_groups > 0:
+        for gid in range(muw._num_groups):
+            muw._get_group_codeword_str(gid)  # populates muw.group_codewords[gid]
         storage_mb = get_storage_size_mb(muw.group_codewords)
-        num_groups = len(muw.group_codewords)
-        if hasattr(muw, 'group_to_users') and muw.group_to_users:
-            # Handle both dict and list formats (for future optimizations)
-            if isinstance(muw.group_to_users, dict):
-                users_per_group = sum(len(users) for users in muw.group_to_users.values()) / len(muw.group_to_users) if muw.group_to_users else 0
-            else:  # list format
-                users_per_group = sum(len(users) for users in muw.group_to_users) / len(muw.group_to_users) if muw.group_to_users else 0
-    # Naive scheme: no storage (computed on-the-fly)
+        num_groups = muw._num_groups
+        users_per_group = muw._users_per_group
+    # Naive scheme: no stored codeword table (computed on-the-fly, storage_mb stays 0)
     
     return {
         'init_time_sec': init_time,
