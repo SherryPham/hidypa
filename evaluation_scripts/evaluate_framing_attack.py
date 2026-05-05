@@ -1,29 +1,4 @@
-﻿"""
-evaluate_framing_attack.py
-
-Evaluates framing attack resistance using Codeword Recovery Rate (CRR).
-
-Threat model (Sec 2.2.3, Appendix C.2):
-  - MAU baseline: adversary is Codeword-Aware -- the static codeword database is
-    breached, so the victim codeword is known. The adversary picks the element of
-    the feasible set F(T) that minimises Hamming distance to the victim.
-  - Hi-DyPa: adversary is Codeword-Blind -- codewords are generated on-the-fly
-    from a secret group seed Kg[g*] that the adversary does not possess (Theorem 6).
-    The adversary can only pick uniformly at random from F(T).
-
-Metric - CRR(k):
-  Run k independent trials (each with a freshly drawn colluder pair and victim).
-  CRR(k) = mean codeword recovery rate (%) over those k trials.
-
-Each trial generates real watermarked text via the model, extracts codewords via
-lbw.detect(), computes F(T) from the extracted (possibly noisy) codewords, and
-measures how closely the adversary chosen target matches the victim codeword.
-
-Usage:
-  python evaluate_framing_attack.py --scheme naive --l-bits 8 --num-prompts 100
-  python evaluate_framing_attack.py --scheme hi_dypa --group-bits 4 --user-bits 4 --num-prompts 100
-"""
-
+﻿
 import argparse
 import gzip
 import itertools
@@ -102,7 +77,7 @@ def select_participants_mau(muw):
 
 def select_participants_hidypa(muw):
     """
-    Cross-group selection (Theorem 6 scenario):
+    Cross-group selection:
       >=3 groups: colluders from g1, g2; victim from distinct g3.
          2 groups: colluders from g1, g2; victim from either (excluding the two colluders).
          1 group:  same-group fallback.

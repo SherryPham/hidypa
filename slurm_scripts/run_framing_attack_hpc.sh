@@ -66,7 +66,8 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 100 \
+    --n-trials 20 \
+    --max-k 10 \
     --users-file /workspace/assets/users.csv \
     --max-new-tokens 400 \
     --seed 42 \
@@ -92,7 +93,8 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 100 \
+    --n-trials 20 \
+    --max-k 10 \
     --users-file /workspace/assets/users.csv \
     --max-new-tokens 400 \
     --seed 42 \
@@ -118,7 +120,8 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 100 \
+    --n-trials 20 \
+    --max-k 10 \
     --users-file /workspace/assets/users.csv \
     --max-new-tokens 400 \
     --seed 42 \
@@ -144,7 +147,8 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 100 \
+    --n-trials 20 \
+    --max-k 10 \
     --users-file /workspace/assets/users.csv \
     --max-new-tokens 400 \
     --seed 42 \
@@ -170,7 +174,8 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 100 \
+    --n-trials 20 \
+    --max-k 10 \
     --users-file /workspace/assets/users.csv \
     --max-new-tokens 400 \
     --seed 42 \
@@ -196,7 +201,8 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 100 \
+    --n-trials 20 \
+    --max-k 10 \
     --users-file /workspace/assets/users.csv \
     --max-new-tokens 400 \
     --seed 42 \
@@ -222,7 +228,8 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 100 \
+    --n-trials 20 \
+    --max-k 10 \
     --users-file /workspace/assets/users.csv \
     --max-new-tokens 400 \
     --seed 42 \
@@ -248,7 +255,8 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_framing_attack.p
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 100 \
+    --n-trials 20 \
+    --max-k 10 \
     --users-file /workspace/assets/users.csv \
     --max-new-tokens 400 \
     --seed 42 \
