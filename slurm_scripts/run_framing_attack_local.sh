@@ -10,7 +10,7 @@ set -e
 RUN_TAG=${RUN_TAG:-local_$(date +%Y%m%d_%H%M%S)}
 echo "Using run tag: ${RUN_TAG}"
 echo "Running framing attack resistance for all 8 configurations (DeepSeek-LLM-7B)"
-echo "n_trials=20, max_k=10 — total generations per config: 400"
+echo "n_trials=4, k=[1,5,10,50,100] — total generations per config: 800"
 echo ""
 
 mkdir -p evaluation/framing_attack
@@ -30,7 +30,7 @@ python evaluation_scripts/evaluate_framing_attack.py \
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file assets/prompts.txt \
-    --n-trials 20 \
+    --n-trials 4 \
     --k-values 1 5 10 50 100 \
     --users-file assets/users.csv \
     --max-new-tokens 400 \
@@ -57,7 +57,7 @@ python evaluation_scripts/evaluate_framing_attack.py \
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file assets/prompts.txt \
-    --n-trials 20 \
+    --n-trials 4 \
     --k-values 1 5 10 50 100 \
     --users-file assets/users.csv \
     --max-new-tokens 400 \
@@ -84,7 +84,7 @@ python evaluation_scripts/evaluate_framing_attack.py \
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file assets/prompts.txt \
-    --n-trials 20 \
+    --n-trials 4 \
     --k-values 1 5 10 50 100 \
     --users-file assets/users.csv \
     --max-new-tokens 400 \
@@ -111,7 +111,7 @@ python evaluation_scripts/evaluate_framing_attack.py \
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file assets/prompts.txt \
-    --n-trials 20 \
+    --n-trials 4 \
     --k-values 1 5 10 50 100 \
     --users-file assets/users.csv \
     --max-new-tokens 400 \
@@ -138,7 +138,7 @@ python evaluation_scripts/evaluate_framing_attack.py \
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file assets/prompts.txt \
-    --n-trials 20 \
+    --n-trials 4 \
     --k-values 1 5 10 50 100 \
     --users-file assets/users.csv \
     --max-new-tokens 400 \
@@ -165,7 +165,7 @@ python evaluation_scripts/evaluate_framing_attack.py \
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file assets/prompts.txt \
-    --n-trials 20 \
+    --n-trials 4 \
     --k-values 1 5 10 50 100 \
     --users-file assets/users.csv \
     --max-new-tokens 400 \
@@ -192,7 +192,7 @@ python evaluation_scripts/evaluate_framing_attack.py \
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file assets/prompts.txt \
-    --n-trials 20 \
+    --n-trials 4 \
     --k-values 1 5 10 50 100 \
     --users-file assets/users.csv \
     --max-new-tokens 400 \
@@ -219,7 +219,7 @@ python evaluation_scripts/evaluate_framing_attack.py \
     --hashing-context 5 \
     --z-threshold 4.0 \
     --prompts-file assets/prompts.txt \
-    --n-trials 20 \
+    --n-trials 4 \
     --k-values 1 5 10 50 100 \
     --users-file assets/users.csv \
     --max-new-tokens 400 \

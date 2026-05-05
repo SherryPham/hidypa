@@ -1,0 +1,4 @@
+scheme,k,CRR_mean,CRR_std
+naive,1,100.0,0.0
+naive,5,90.0,5.0
+naive,10,85.0,7.5
