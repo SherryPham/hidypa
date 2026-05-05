@@ -81,7 +81,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_rewrite_attack.p
     --scheme naive \
     --l-bits 8 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 300 \
+    --num-prompts 10 \
     --users-file /workspace/assets/users.csv \
     --model deepseek-llm-7b \
     --delta 3.5 \
@@ -105,7 +105,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_rewrite_attack.p
     --user-bits 7 \
     --l-bits 8 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 300 \
+    --num-prompts 10 \
     --users-file /workspace/assets/users.csv \
     --model deepseek-llm-7b \
     --delta 3.5 \
@@ -129,7 +129,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_rewrite_attack.p
     --user-bits 6 \
     --l-bits 8 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 300 \
+    --num-prompts 10 \
     --users-file /workspace/assets/users.csv \
     --model deepseek-llm-7b \
     --delta 3.5 \
@@ -153,7 +153,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_rewrite_attack.p
     --user-bits 5 \
     --l-bits 8 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 300 \
+    --num-prompts 10 \
     --users-file /workspace/assets/users.csv \
     --model deepseek-llm-7b \
     --delta 3.5 \
@@ -177,7 +177,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_rewrite_attack.p
     --user-bits 4 \
     --l-bits 8 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 300 \
+    --num-prompts 10 \
     --users-file /workspace/assets/users.csv \
     --model deepseek-llm-7b \
     --delta 3.5 \
@@ -201,7 +201,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_rewrite_attack.p
     --user-bits 3 \
     --l-bits 8 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 300 \
+    --num-prompts 10 \
     --users-file /workspace/assets/users.csv \
     --model deepseek-llm-7b \
     --delta 3.5 \
@@ -225,7 +225,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_rewrite_attack.p
     --user-bits 2 \
     --l-bits 8 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 300 \
+    --num-prompts 10 \
     --users-file /workspace/assets/users.csv \
     --model deepseek-llm-7b \
     --delta 3.5 \
@@ -249,7 +249,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_rewrite_attack.p
     --user-bits 1 \
     --l-bits 8 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 300 \
+    --num-prompts 10 \
     --users-file /workspace/assets/users.csv \
     --model deepseek-llm-7b \
     --delta 3.5 \
@@ -273,7 +273,7 @@ ${APPTAINER_RUN} python3 /workspace/evaluation_scripts/evaluate_rewrite_attack.p
     --user-bits 0 \
     --l-bits 8 \
     --prompts-file /workspace/assets/prompts.txt \
-    --num-prompts 300 \
+    --num-prompts 10 \
     --users-file /workspace/assets/users.csv \
     --model deepseek-llm-7b \
     --delta 3.5 \
