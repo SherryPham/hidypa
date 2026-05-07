@@ -9,17 +9,9 @@ random_notes.txt
 # Helper script for renaming (one-time use)
 helper_scripts/rename_hierarchical_to_hidypa.py
 
-# =============================================================================
-# Environment-specific config files (contain user paths and HPC account IDs)
-# Keep *.example files tracked - they are templates
-# =============================================================================
+
 config/hpc_paths.sh
 config/paths.py
-
-# =============================================================================
-# Evaluation output directories (contain identifying paths in JSON files)
-# These are generated outputs and should not be committed
-# =============================================================================
 
 evaluation_2_backup/
 COMMANDS.md
@@ -28,9 +20,7 @@ helper_scripts/anonymize_evaluation_paths.py
 evaluation_scripts_local/
 demo_backup/
 
-# =============================================================================
-# Additional hidden files and folders
-# =============================================================================
+
 demonstration/
 evaluation/
 evaluation_scripts/
@@ -40,3 +30,5 @@ hidypa.def
 output_lbit.txt
 output.txt
 *.key
+HiDyPa-WM.pdf
+show_paraphrase_results.py
