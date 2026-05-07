@@ -1,2 +1,0 @@
-scheme,init_time_sec,init_memory_mb,storage_mb,num_groups,users_per_group,embed_time_sec,embed_overhead_percent,overhead_per_token_ms,time_per_token_ms,detect_time_sec,hmac_operations,trace_time_sec,trace_comparisons,max_users,max_groups,max_users_per_group,group_bits,user_bits
-hi_dypa_G8_U0,0.10233952500857413,1.4375,0.010372161865234375,128,1.0,4.671398240206491,-21.9977883834417,-1.7120086827040242,9.663919455645127,1.7714228991049847,16.0,0.0003074537482461892,128.0,256,256,1,8,0

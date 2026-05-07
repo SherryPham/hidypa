@@ -27,3 +27,16 @@ test_evaluation/
 helper_scripts/anonymize_evaluation_paths.py
 evaluation_scripts_local/
 demo_backup/
+
+# =============================================================================
+# Additional hidden files and folders
+# =============================================================================
+demonstration/
+evaluation/
+evaluation_scripts/
+slurm_scripts/
+desktop.ini
+hidypa.def
+output_lbit.txt
+output.txt
+*.key

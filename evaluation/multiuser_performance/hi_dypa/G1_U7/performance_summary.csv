@@ -1,2 +1,0 @@
-scheme,init_time_sec,init_memory_mb,storage_mb,num_groups,users_per_group,embed_time_sec,embed_overhead_percent,overhead_per_token_ms,time_per_token_ms,detect_time_sec,hmac_operations,trace_time_sec,trace_comparisons,max_users,max_groups,max_users_per_group,group_bits,user_bits
-hi_dypa_G1_U7,0.19412530201952904,2.03125,7.05718994140625e-05,1,128.0,4.974112671457134,-50.71213872276907,-4.401061260276247,10.318019068539273,1.8258872081253017,16.0,0.0005555159075108046,128.0,256,2,128,1,7

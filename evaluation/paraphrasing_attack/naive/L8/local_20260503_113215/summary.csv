@@ -1,8 +1,0 @@
-metric,value
-lbit_accuracy,0.19041666666666668
-full_identity_accuracy,0.31708333333333333
-false_positive_rate,0.5110416666666666
-false_negative_rate,0.171875
-avg_invalid_symbols,3.7139583333333333
-avg_hamming_distance,0.013541666666666667
-avg_z_score,4.027279429923342
