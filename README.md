@@ -40,7 +40,14 @@ This repository implements the following watermarking schemes:
    - Flexible allocation of bits between group and user identifiers
    - Improved scalability and tracing efficiency compared to baseline schemes
 
-All schemes share the same underlying L-bit embedding mechanism, ensuring fair and controlled comparisons across different multi-user approaches.
+6. **Segment-WM Baseline** (`SegmentMultiUserWatermarker`) — *external baseline for comparison*
+   - Re-implementation of the segment-assignment multi-bit scheme from *Provably Robust Multi-bit Watermarking for AI-generated Text*
+   - Reed-Solomon encodes the payload into segments, then embeds each segment as a cyclically shifted green list
+   - Flat 8-bit codeword (the user ID), so it reports at `(Lg, Lu) = (0, 8)` like the MAU baseline
+   - Available as `--scheme segment` in every Table II–XIII evaluation script
+   - See [docs/SEGMENT_WM_BASELINE.md](docs/SEGMENT_WM_BASELINE.md)
+
+Schemes 1–5 share the same underlying L-bit embedding mechanism, ensuring fair and controlled comparisons across different multi-user approaches. The Segment-WM baseline uses its own embedding mechanism (that is the point of the comparison) but is evaluated on identical models, prompts, users, attacks and metrics.
 
 ## Table of Contents
 
@@ -1376,6 +1383,32 @@ sbatch slurm_scripts/run_synonym_attack_hpc.sh
 # Run collusion resistance evaluation (9 configurations, 300 prompts each)
 sbatch slurm_scripts/run_collusion_eval_hpc.sh
 ```
+
+### Segment-WM Baseline Scripts
+
+These run **only** the Segment-WM comparison row (`(Lg, Lu) = (0, 8)`) for Tables II–XIII,
+leaving all existing MAU and Hi-DyPa results untouched. The model defaults to GPT-2 and is
+overridable with the `MODEL` environment variable.
+
+```bash
+# GPT-2 (Tables II, III, IV, V, VI, VIII, X, XII)
+sbatch slurm_scripts/run_segment_detection_hpc.sh       # Table II
+sbatch slurm_scripts/run_segment_collusion_hpc.sh       # Tables III, IV
+sbatch slurm_scripts/run_segment_framing_hpc.sh         # Table V
+sbatch slurm_scripts/run_segment_robustness_hpc.sh      # Table VI
+sbatch slurm_scripts/run_segment_paraphrasing_hpc.sh    # Table VIII
+sbatch slurm_scripts/run_segment_synonym_hpc.sh         # Table X
+sbatch slurm_scripts/run_segment_rewrite_hpc.sh         # Table XII
+
+# DeepSeek-7B (Tables VII, IX, XI, XIII)
+MODEL=deepseek-llm-7b sbatch --export=ALL slurm_scripts/run_segment_robustness_hpc.sh
+
+# Collect the paper rows
+python helper_scripts/collect_segment_rows.py --evaluation-dir evaluation --model gpt2 --latex
+```
+
+See [docs/SEGMENT_WM_BASELINE.md](docs/SEGMENT_WM_BASELINE.md) for the scheme parameters
+and the three documented deviations from the reference implementation.
 
 ### Asset Files
 
