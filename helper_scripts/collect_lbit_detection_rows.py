@@ -14,6 +14,11 @@ Usage:
         --model gpt2 --run-tag job_1234567 --latex
 """
 
+# Defer annotation evaluation so the "dict | None" style unions below parse on
+# the login node's system python3, which predates PEP 604 (3.10). The container
+# python is new enough, but this script is often run outside it.
+from __future__ import annotations
+
 import argparse
 import json
 import os

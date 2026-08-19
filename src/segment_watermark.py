@@ -30,6 +30,7 @@ DEFAULT_RS_PARAMS = {
     12: (6, 3, 4),     # t = 1 (rs_search.py reports (6, 3, 4) for b = 12)
     16: (6, 4, 4),     # t = 1
     32: (6, 4, 8),     # matches the reference README example
+    48: (8, 6, 8),     # t = 1, continues the n = k + 2 family (k*m = 6*8 = 48)
 }
 
 
