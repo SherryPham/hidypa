@@ -20,6 +20,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import sys
 
 current_dir = os.path.dirname(__file__)
@@ -49,8 +50,25 @@ VARIANT_PREFIX = {
 }
 
 
-def find_summary(evaluation_dir, experiment, run_tag, filename="summary.json"):
-    """Locate the segment summary for one experiment."""
+def summary_model(path):
+    """Read the model name recorded inside a summary.json, if any."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f).get("model")
+    except Exception:
+        return None
+
+
+def find_summary(evaluation_dir, experiment, run_tag, filename="summary.json", model=None):
+    """
+    Locate the segment summary for one experiment.
+
+    GPT-2 and DeepSeek runs write to the same directory tree, so picking purely
+    by modification time would silently report one model's numbers under the
+    other's table number. Every summary.json records the model it was produced
+    with, so filter on that and only fall back to newest-wins when the field is
+    missing (older result files).
+    """
     base = os.path.join(evaluation_dir, experiment, "segment", "L8")
     if not os.path.isdir(base):
         return None
@@ -63,10 +81,27 @@ def find_summary(evaluation_dir, experiment, run_tag, filename="summary.json"):
             key=lambda p: os.path.getmtime(p) if os.path.exists(p) else 0,
             reverse=True,
         )
-    for path in candidates:
-        if os.path.exists(path):
-            return path
-    return None
+
+    existing = [p for p in candidates if os.path.exists(p)]
+    if not existing:
+        return None
+
+    if model and not run_tag:
+        # The nested collusion summaries live one level down; check the parent.
+        for path in existing:
+            probe = path
+            if os.path.basename(os.path.dirname(path)).endswith("_colluders"):
+                probe = os.path.join(os.path.dirname(os.path.dirname(path)), "summary.json")
+            recorded = summary_model(path) or summary_model(probe)
+            if recorded == model:
+                return path
+        matched_any = any(
+            summary_model(p) is not None for p in existing
+        )
+        if matched_any:
+            return None      # results exist, but none for this model
+
+    return existing[0]
 
 
 def load(path):
@@ -74,8 +109,8 @@ def load(path):
         return json.load(f)
 
 
-def detection_row(evaluation_dir, run_tag):
-    path = find_summary(evaluation_dir, "hi_dypa_detection", run_tag)
+def detection_row(evaluation_dir, run_tag, model=None):
+    path = find_summary(evaluation_dir, "hi_dypa_detection", run_tag, model=model)
     if not path:
         return None, None
     data = load(path)
@@ -86,10 +121,10 @@ def detection_row(evaluation_dir, run_tag):
     }, path
 
 
-def collusion_row(evaluation_dir, run_tag, num_colluders):
+def collusion_row(evaluation_dir, run_tag, num_colluders, model=None):
     path = find_summary(
         evaluation_dir, "collusion_resistance", run_tag,
-        os.path.join(f"{num_colluders}_colluders", "summary.json"),
+        os.path.join(f"{num_colluders}_colluders", "summary.json"), model=model,
     )
     if not path:
         return None, None
@@ -106,8 +141,8 @@ def collusion_row(evaluation_dir, run_tag, num_colluders):
     }, path
 
 
-def framing_row(evaluation_dir, run_tag, k):
-    path = find_summary(evaluation_dir, "framing_attack", run_tag)
+def framing_row(evaluation_dir, run_tag, k, model=None):
+    path = find_summary(evaluation_dir, "framing_attack", run_tag, model=model)
     if not path:
         return None, None
     data = load(path)
@@ -118,9 +153,80 @@ def framing_row(evaluation_dir, run_tag, k):
     return {"CRR (%)": entry["mean"]}, path
 
 
-def attack_row(evaluation_dir, experiment, run_tag):
+def model_from_slurm_log(perf_dir):
+    """
+    Recover the model for a performance run that predates the `model` column.
+
+    The directory is named segment_L8_job_<jobid>, and every SLURM script prints
+    "Model      : <name>" in its header, so the log identifies the run.
+    """
+    match = re.search(r"segment_L8_job_(\d+)$", os.path.basename(perf_dir.rstrip(os.sep)))
+    if not match:
+        return None
+    log = os.path.join(parent_dir, "slurm_out", f"slurm-{match.group(1)}.out")
+    if not os.path.exists(log):
+        return None
+    try:
+        with open(log, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                found = re.match(r"\s*Model\s*:\s*(\S+)", line)
+                if found:
+                    return found.group(1)
+                if line.startswith("==="):
+                    continue
+    except Exception:
+        return None
+    return None
+
+
+def read_perf_csv(path):
+    with open(path, "r", encoding="utf-8") as f:
+        header = f.readline().strip().split(",")
+        values = f.readline().strip().split(",")
+    return dict(zip(header, values))
+
+
+def performance_row(evaluation_dir, run_tag, model=None):
+    """Table XIV: tracing time in milliseconds."""
+    base = os.path.join(evaluation_dir, "multiuser_performance")
+    if not os.path.isdir(base):
+        return None, None
+
+    pattern = f"segment_L8_{run_tag}" if run_tag else "segment_L8_*"
+    candidates = sorted(
+        glob.glob(os.path.join(base, pattern, "performance_summary.csv")),
+        key=lambda p: os.path.getmtime(p),
+        reverse=True,
+    )
+    if not candidates:
+        return None, None
+
+    path = candidates[0]
+    if model and not run_tag:
+        chosen = None
+        for candidate in candidates:
+            record = read_perf_csv(candidate)
+            recorded = record.get("model") or model_from_slurm_log(os.path.dirname(candidate))
+            if recorded == model:
+                chosen = candidate
+                break
+            if recorded is None and chosen is None:
+                chosen = candidate      # unidentifiable: keep as last resort
+        if chosen is None:
+            return None, None
+        path = chosen
+
+    record = read_perf_csv(path)
+    try:
+        trace_ms = float(record["trace_time_sec"]) * 1000.0
+    except (KeyError, ValueError):
+        return None, path
+    return {"Trace (ms)": trace_ms}, path
+
+
+def attack_row(evaluation_dir, experiment, run_tag, model=None):
     """Average each metric over the four positional modes, per perturbation ratio."""
-    path = find_summary(evaluation_dir, experiment, run_tag)
+    path = find_summary(evaluation_dir, experiment, run_tag, model=model)
     if not path:
         return None, None
     data = load(path)
@@ -164,6 +270,10 @@ def main():
                         help="Number of colluding trials to report for Table V (default: 50)")
     parser.add_argument("--latex", action="store_true",
                         help="Also emit the LaTeX row for each table")
+    parser.add_argument("--table", type=str, nargs="+", default=None,
+                        metavar="ROMAN",
+                        help="Show only these tables, e.g. --table II  or  --table III IV. "
+                             "Default: all of them.")
     args = parser.parse_args()
 
     evaluation_dir = args.evaluation_dir
@@ -180,28 +290,38 @@ def main():
 
     rows = []
 
-    row, path = detection_row(evaluation_dir, args.run_tag)
-    rows.append(("Table II  (clean-text detection)", row, path,
+    row, path = detection_row(evaluation_dir, args.run_tag, args.model)
+    rows.append(("II", "Table II  (clean-text detection)", row, path,
                  ["Acc.", "FP"], 3))
 
     for k in (2, 3):
-        row, path = collusion_row(evaluation_dir, args.run_tag, k)
+        row, path = collusion_row(evaluation_dir, args.run_tag, k, args.model)
         table = "III" if k == 2 else "IV"
-        rows.append((f"Table {table}  ({k}-colluder collusion)", row, path,
+        rows.append((table, f"Table {table}  ({k}-colluder collusion)", row, path,
                      ["Acc.", "Wrong Acc."], 2))
 
-    row, path = framing_row(evaluation_dir, args.run_tag, args.framing_k)
-    rows.append((f"Table V   (framing, k={args.framing_k})", row, path,
+    row, path = framing_row(evaluation_dir, args.run_tag, args.framing_k, args.model)
+    rows.append(("V", f"Table V   (framing, k={args.framing_k})", row, path,
                  ["CRR (%)"], 1))
 
     for experiment in ("robustness", "paraphrasing_attack", "synonym_attack", "rewrite_attack"):
         table = EXPERIMENTS[experiment][1 if is_deepseek else 0]
-        row, path = attack_row(evaluation_dir, experiment, args.run_tag)
+        row, path = attack_row(evaluation_dir, experiment, args.run_tag, args.model)
         columns = [f"{r:.2f} {m}" for r in RATIOS for m in ("Acc.", "FP")]
         label = experiment.replace("_", " ")
-        rows.append((f"Table {table:<4}({label})", row, path, columns, 3))
+        rows.append((table, f"Table {table:<4}({label})", row, path, columns, 3))
 
-    for title, row, path, columns, decimals in rows:
+    row, path = performance_row(evaluation_dir, args.run_tag, args.model)
+    rows.append(("XIV", "Table XIV (tracing time)", row, path, ["Trace (ms)"], 3))
+
+    if args.table:
+        wanted = {t.upper() for t in args.table}
+        rows = [r for r in rows if r[0].upper() in wanted]
+        if not rows:
+            sys.exit(f"No known table matches {sorted(wanted)}. "
+                     f"Valid: II III IV V VI VII VIII IX X XI XII XIII XIV")
+
+    for _table_id, title, row, path, columns, decimals in rows:
         print()
         print(f"{title}")
         if row is None:

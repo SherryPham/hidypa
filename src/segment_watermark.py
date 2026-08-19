@@ -1,27 +1,3 @@
-# segment_watermark.py: Segment-assignment multi-bit watermarking baseline.
-#
-# Re-implementation of the scheme from "Provably Robust Multi-bit Watermarking
-# for AI-generated Text" (referred to here as Segment-WM) inside the Hi-DyPa
-# framework, so it can be evaluated as one extra row of Tables II-XIII using the
-# same models, prompts, users, attacks and metrics as MAU and Hi-DyPa.
-#
-# Scheme summary (reference: segment-wm/wm/generator.py, segment-wm/wm/detector.py):
-#   * The b-bit payload is split into k symbols of m bits (b = k * m) and
-#     Reed-Solomon encoded into n symbols over GF(2^m).
-#   * At every generated position the context n-gram seeds a PRNG that draws a
-#     green list of gamma * V tokens; the green bias vector is cyclically
-#     shifted by the value of the symbol assigned to that position and delta is
-#     added to the shifted green tokens.
-#   * The position -> segment assignment is either drawn from the same PRNG
-#     ('rs') or read from a frequency-balanced hash of the previous token
-#     ('rsbh', the paper's headline variant).
-#   * Detection recomputes the green list per position, accumulates a COUNT
-#     array of size 2^m per segment, takes the arg-max per segment, and RS
-#     decodes the resulting n symbols back to the payload.
-#
-# The public API mirrors LBitWatermarker so that NaiveMultiUserWatermarker can
-# drive it unchanged: keygen / embed(master_key, bitstring, prompt) /
-# detect(master_key, text) -> L-character string.
 
 import functools
 import hashlib

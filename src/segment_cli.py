@@ -1,5 +1,3 @@
-# segment_cli.py: shared argparse / construction helpers for the Segment-WM
-# baseline row, so the seven evaluation scripts stay in sync.
 
 import json
 import os

@@ -25,6 +25,11 @@ MAU already uses.
 | VIII (GPT-2), IX (DeepSeek) | T5 paraphrasing | `evaluate_paraphrasing_attack.py` | `run_segment_paraphrasing_hpc.sh` |
 | X (GPT-2), XI (DeepSeek) | WordNet synonym substitution | `evaluate_synonym_attack.py` | `run_segment_synonym_hpc.sh` |
 | XII (GPT-2), XIII (DeepSeek) | LLM rewriting | `evaluate_rewrite_attack.py` | `run_segment_rewrite_hpc.sh` |
+| XIV | Tracing time (ms) | `evaluate_multiuser_performance.py` | `run_segment_performance_hpc.sh` |
+
+Tables II, III, IV, V and XIV each carry a GPT-2 *and* a DeepSeek-7B column, so those
+scripts are run twice (`MODEL=deepseek-llm-7b` for the second pass). Tables VI–XIII are
+split one model per table.
 
 Each SLURM script runs **only** the segment configuration, so none of the existing
 MAU / Hi-DyPa results are recomputed or overwritten. Results land in

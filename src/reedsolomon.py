@@ -1,15 +1,4 @@
-# reedsolomon.py: self-contained Reed-Solomon codec over GF(2^m).
-#
-# The Segment-WM baseline (Provably Robust Multi-bit Watermarking for AI-generated
-# Text) encodes the payload with a Reed-Solomon code before spreading it over
-# token segments. Its reference implementation depends on `galois`, which is not
-# installed in the Hi-DyPa Apptainer container, so we provide an equivalent
-# classical (narrow-sense, systematic) RS codec here with no extra dependencies.
-#
-# Only encode/decode over small fields (m <= 8, n <= 2^m - 1) is needed, so the
-# straightforward table-driven implementation is fast enough.
 
-# Primitive polynomials for GF(2^m), m = 2..8 (bit i set == coefficient of x^i).
 PRIMITIVE_POLY = {
     2: 0b111,
     3: 0b1011,
