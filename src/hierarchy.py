@@ -17,8 +17,12 @@ from itertools import combinations
 ERASURE_SYMBOLS = frozenset({"⊥", "*", "?"})
 
 
-def _popcount(value: int) -> int:
-    return value.bit_count()
+if hasattr(int, "bit_count"):          # Python 3.10+
+    def _popcount(value: int) -> int:
+        return value.bit_count()
+else:                                   # older interpreters (e.g. HPC login nodes)
+    def _popcount(value: int) -> int:
+        return bin(value).count("1")
 
 
 def hamming(a: str, b: str) -> int:

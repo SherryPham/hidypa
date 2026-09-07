@@ -291,8 +291,7 @@ def test_table_entries_match_bruteforce():
     for value in range(16):
         for erasure in range(16):
             keep = 0b1111 & ~erasure
-            best = min((value ^ w) .bit_count() if False else bin((value ^ w) & keep).count("1")
-                       for w in book.ints)
+            best = min(bin((value ^ w) & keep).count("1") for w in book.ints)
             mask = 0
             for child, w in enumerate(book.ints):
                 if bin((value ^ w) & keep).count("1") == best:
