@@ -1,0 +1,13 @@
+{
+  "name": "l16_flat",
+  "L": 16,
+  "levels": [
+    {
+      "name": "user",
+      "bits": 16,
+      "fanout": 65536,
+      "min_distance": 1
+    }
+  ],
+  "assignment": "sequential"
+}

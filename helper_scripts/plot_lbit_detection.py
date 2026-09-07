@@ -62,10 +62,12 @@ ACCURACY = {
         "lbit_accuracy":          [0.8533, 0.1300, 0.0033, 0.0000, np.nan],
         "group_accuracy":         [np.nan] * 5,
     },
-    # Segment-WM baseline: filled in by --csv once the segment array finishes.
+    # Segment-WM baseline, job array 15709903, RS params from DEFAULT_RS_PARAMS.
+    # Payload recovery and identification coincide here: the payload *is* the
+    # user id, decoded to the nearest codeword, so the two rows are identical.
     "segment": {
-        "full_identity_accuracy": [np.nan] * 5,
-        "lbit_accuracy":          [np.nan] * 5,
+        "full_identity_accuracy": [0.9233, 0.8467, 0.7600, 0.6467, 0.3933],
+        "lbit_accuracy":          [0.9233, 0.8467, 0.7600, 0.6467, 0.3933],
         "group_accuracy":         [np.nan] * 5,
     },
 }
@@ -87,8 +89,8 @@ Z_THRESHOLD = 4.0
 # =============================================================================
 SERIES = {
     "hi_dypa": {"color": "#2a78d6", "marker": "o", "linestyle": "-",  "label": "Hi-DyPa"},
-    "naive":   {"color": "#eb6834", "marker": "s", "linestyle": "--", "label": "Flat (naive)"},
-    "segment": {"color": "#4a3aa7", "marker": "^", "linestyle": ":",  "label": "Segment-WM"},
+    "naive":   {"color": "#eb6834", "marker": "s", "linestyle": "--", "label": "MAU"},
+    "segment": {"color": "#4a3aa7", "marker": "^", "linestyle": ":",  "label": "Segment"},
 }
 
 INK_PRIMARY = "#0b0b0b"

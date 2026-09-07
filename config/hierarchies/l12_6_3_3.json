@@ -1,0 +1,25 @@
+{
+  "name": "l12_6_3_3",
+  "L": 12,
+  "levels": [
+    {
+      "name": "container",
+      "bits": 6,
+      "fanout": 32,
+      "min_distance": 2
+    },
+    {
+      "name": "team",
+      "bits": 3,
+      "fanout": 4,
+      "min_distance": 2
+    },
+    {
+      "name": "user",
+      "bits": 3,
+      "fanout": 8,
+      "min_distance": 1
+    }
+  ],
+  "assignment": "sequential"
+}

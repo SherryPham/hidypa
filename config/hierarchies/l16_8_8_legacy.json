@@ -1,0 +1,19 @@
+{
+  "name": "l16_8_8_legacy",
+  "L": 16,
+  "levels": [
+    {
+      "name": "group",
+      "bits": 8,
+      "fanout": 128,
+      "min_distance": 2
+    },
+    {
+      "name": "user",
+      "bits": 8,
+      "fanout": 256,
+      "min_distance": 1
+    }
+  ],
+  "assignment": "sequential"
+}
