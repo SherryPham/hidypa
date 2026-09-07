@@ -72,7 +72,9 @@ echo "=========================================="
 echo "Run tag : ${RUN_TAG}"
 echo "Model   : ${MODEL}"
 echo "Node    : $(hostname)"
-nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+# nvidia-smi is not on the host PATH on every GPU node; fall back to slurm.
+# torch reports the real device from inside the container in step 1.
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null \n  || scontrol show node "$(hostname -s)" 2>/dev/null | grep -oiE "Gres=[^ ]*" \n  || echo "GPU info unavailable on host (see 'gpu :' line in step 1)"
 echo "=========================================="
 
 # -----------------------------------------------------------------------------

@@ -374,6 +374,11 @@ def main():
         print(f"  NOTE: GPT-2 context is {GPT2_CONTEXT} tokens; max_new_tokens is "
               f"clamped accordingly.")
     print(f"  device: {model.device}")
+    if torch.cuda.is_available():
+        props = torch.cuda.get_device_properties(0)
+        print(f"  gpu   : {torch.cuda.get_device_name(0)} "
+              f"({props.total_memory / 1e9:.0f} GB, capability {props.major}.{props.minor})")
+        print(f"  torch : {torch.__version__}, cuda {torch.version.cuda}")
 
     def make_lbw(L):
         zbw = ZeroBitWatermarker(
