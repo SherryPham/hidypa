@@ -72,9 +72,16 @@ echo "=========================================="
 echo "Run tag : ${RUN_TAG}"
 echo "Model   : ${MODEL}"
 echo "Node    : $(hostname)"
-# nvidia-smi is not on the host PATH on every GPU node; fall back to slurm.
-# torch reports the real device from inside the container in step 1.
-nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null \n  || scontrol show node "$(hostname -s)" 2>/dev/null | grep -oiE "Gres=[^ ]*" \n  || echo "GPU info unavailable on host (see 'gpu :' line in step 1)"
+# nvidia-smi is not on the host PATH on every OzSTAR GPU node (gina1 has no
+# copy), and apptainer's --nv then warns about missing nv files even though
+# CUDA works fine inside the container. The authoritative device line is the
+# "gpu   :" line torch prints in step 1.
+if command -v nvidia-smi >/dev/null 2>&1; then
+    nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+else
+    scontrol show node "$(hostname -s)" 2>/dev/null | grep -oiE "Gres=[^ ]*" || true
+    echo "(nvidia-smi not on host PATH; see the 'gpu   :' line in step 1)"
+fi
 echo "=========================================="
 
 # -----------------------------------------------------------------------------
