@@ -1,7 +1,4 @@
 # hierarchy.py: multi-level hierarchical codeword construction, indexing and decoding.
-#
-# Deliberately depends on the standard library only (no torch, no pandas) so the
-# whole codeword/decode layer is unit-testable on CPU in milliseconds.
 
 from __future__ import annotations
 
@@ -17,10 +14,10 @@ from itertools import combinations
 ERASURE_SYMBOLS = frozenset({"⊥", "*", "?"})
 
 
-if hasattr(int, "bit_count"):          # Python 3.10+
+if hasattr(int, "bit_count"):          
     def _popcount(value: int) -> int:
         return value.bit_count()
-else:                                   # older interpreters (e.g. HPC login nodes)
+else:                                   
     def _popcount(value: int) -> int:
         return bin(value).count("1")
 
@@ -532,7 +529,7 @@ class LevelDecodeTable:
     level is short: the table has 4^bits entries.
     """
 
-    __slots__ = ("bits", "fanout", "best", "mask")
+    __slots__ = ("bits", "fanout", "best", "second", "mask")
 
     def __init__(self, codebook: Codebook):
         bits = codebook.bits
@@ -540,6 +537,8 @@ class LevelDecodeTable:
         self.bits = bits
         self.fanout = codebook.fanout
         self.best = array("b", bytes(size))
+        # runner-up distance, so a single lookup also yields the level's margin
+        self.second = array("b", bytes(size))
         self.mask = [0] * size
         words = codebook.ints
         full = codebook.mask
@@ -547,22 +546,31 @@ class LevelDecodeTable:
             keep = full & ~erasure
             base = erasure
             for value in range(1 << bits):
-                best = bits + 1
+                best = second = bits + 1
                 accumulated = 0
                 for child in range(codebook.fanout):
                     distance = _popcount((value ^ words[child]) & keep)
                     if distance < best:
+                        second = best
                         best = distance
                         accumulated = 1 << child
                     elif distance == best:
                         accumulated |= 1 << child
+                    elif distance < second:
+                        second = distance
                 slot = (value << bits) | base
                 self.best[slot] = best
+                self.second[slot] = second
                 self.mask[slot] = accumulated
 
     def lookup(self, value: int, erasure: int) -> tuple[int, int]:
         slot = (value << self.bits) | erasure
         return self.best[slot], self.mask[slot]
+
+    def lookup_full(self, value: int, erasure: int) -> tuple[int, int, int]:
+        """(best distance, runner-up distance, bitmask of children at best)."""
+        slot = (value << self.bits) | erasure
+        return self.best[slot], self.second[slot], self.mask[slot]
 
 
 _TABLE_CACHE: dict[tuple[int, int, int], LevelDecodeTable] = {}
@@ -599,6 +607,53 @@ class TableDecoder:
             )
 
         segments = [parse_segment(recovered[start:end]) for start, end in spec.offsets]
+
+        # ---- fast path -------------------------------------------------
+        # Cumulative distance is a SUM of per-level distances and the level
+        # codebooks are shared across parents, so the problem factorises: when
+        # every level has a unique nearest codeword, the best path is simply the
+        # per-level argmin. That is D table lookups and no tree walk. Ties, a
+        # widened margin, or a path landing outside the occupied rows all fall
+        # through to the general search below, which is what keeps ragged trees
+        # correct.
+        if margin == 0:
+            path: list[int] = []
+            distances: list[int] = []
+            margins: list[int | None] = []
+            total = 0
+            for level in range(index.depth):
+                # A ragged node breaks the factorisation: the table's mask and
+                # runner-up range over the FULL fanout, so under a partially
+                # filled parent they can name children that do not exist. Hand
+                # those to the general search, which only walks real children.
+                if index.children_count(tuple(path)) != index.fanouts[level]:
+                    path = None
+                    break
+                value, erasure = segments[level]
+                best, second, bits_mask = self.tables[level].lookup_full(value, erasure)
+                if bits_mask == 0 or (bits_mask & (bits_mask - 1)):
+                    path = None          # no candidate, or a tie at this level
+                    break
+                path.append(bits_mask.bit_length() - 1)
+                distances.append(best)
+                margins.append(None if second > index.spec.levels[level].bits
+                               else second - best)
+                total += best
+            if path is not None:
+                candidate = tuple(path)
+                row = index.row_of_path(candidate)
+                if row < index.num_users:
+                    return DecodeResult(
+                        path=candidate, row=row, ties=[candidate],
+                        per_level_distance=distances,
+                        per_level_margin=margins,
+                        per_level_candidates=[1] * index.depth,
+                        cumulative_distance=total,
+                        containment_path=candidate,
+                        containment_level=index.depth,
+                        candidates_evaluated=index.depth,
+                    )
+        # ---- general coarse-to-fine search -----------------------------
         frontier: list[tuple[tuple[int, ...], int]] = [((), 0)]
         per_level_candidates: list[int] = []
         per_level_margin: list[int | None] = []
@@ -612,10 +667,19 @@ class TableDecoder:
             keep = codebook.mask & ~erasure
             candidates: list[tuple[tuple[int, ...], int]] = []
 
+            # the lookup depends only on this level's segment, never on the
+            # prefix, so compute it once instead of once per surviving parent
+            full_best, full_second, full_mask = table.lookup_full(value, erasure)
+            # a table lookup returns only the minimum-distance children, so the
+            # runner-up needed for per_level_margin has to come from the table
+            # rather than from `candidates`
+            runner_pool: list[int] = []
             for prefix, cumulative in frontier:
                 n_children = index.children_count(prefix)
                 if n_children == codebook.fanout:
-                    best, bits_mask = table.lookup(value, erasure)
+                    best, bits_mask = full_best, full_mask
+                    if full_second <= codebook.bits:
+                        runner_pool.append(cumulative + full_second)
                     evaluated += 1
                     if margin == 0:
                         child = 0
@@ -637,7 +701,10 @@ class TableDecoder:
                                  per_level_distance, evaluated)
 
             best = min(distance for _, distance in candidates)
-            runner_up = min((d for _, d in candidates if d > best), default=None)
+            runner_up = min(
+                [d for _, d in candidates if d > best] + [d for d in runner_pool if d > best],
+                default=None,
+            )
             per_level_margin.append(None if runner_up is None else runner_up - best)
             per_level_distance.append(best - (min(d for _, d in frontier) if frontier else 0))
             frontier = [item for item in candidates if item[1] <= best + margin]

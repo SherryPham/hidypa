@@ -332,3 +332,40 @@ def _run_all():
 
 if __name__ == "__main__":
     sys.exit(_run_all())
+
+
+def test_table_fast_path_matches_scan_exactly():
+    """
+    The factorised fast path must be observationally identical to the scan,
+    including the diagnostic fields. It has been wrong twice: once by losing the
+    runner-up (per_level_margin) and once by trusting the full-fanout table under
+    a ragged parent, so this compares every field on both a complete tree and a
+    ragged one.
+    """
+    for num_users in (1024, 1000):
+        index = HierarchyIndex(OPTION_C3, num_users)
+        decoder = TableDecoder(index)
+        rng = random.Random(4242)
+        for _ in range(4000):
+            row = rng.randrange(num_users)
+            word = list(index.codeword_of_row(row))
+            for _ in range(rng.randrange(0, 7)):
+                word[rng.randrange(16)] = rng.choice("01⊥*")
+            corrupted = "".join(word)
+            a = decode_path(corrupted, index)
+            b = decoder.decode(corrupted)
+            assert sorted(a.ties) == sorted(b.ties), (num_users, corrupted)
+            assert a.cumulative_distance == b.cumulative_distance
+            assert a.containment_path == b.containment_path
+            assert a.per_level_distance == b.per_level_distance
+            assert a.per_level_margin == b.per_level_margin, (num_users, corrupted)
+
+
+def test_fast_path_bails_on_ragged_node():
+    """Container 15 holds 40 users -> 5 teams, so it must not use the table."""
+    index = HierarchyIndex(OPTION_C3, 1000)
+    assert index.children_count((15,)) == 5
+    assert index.fanouts[1] == 8
+    decoder = TableDecoder(index)
+    word = index.codeword_of_row(988)          # path (15, 3, 4)
+    assert decoder.decode(word).path == (15, 3, 4)
