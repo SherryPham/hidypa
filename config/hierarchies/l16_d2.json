@@ -1,0 +1,19 @@
+{
+  "name": "l16_d2",
+  "L": 16,
+  "levels": [
+    {
+      "name": "container",
+      "bits": 8,
+      "fanout": 16,
+      "min_distance": 4
+    },
+    {
+      "name": "user",
+      "bits": 8,
+      "fanout": 64,
+      "min_distance": 2
+    }
+  ],
+  "assignment": "sequential"
+}

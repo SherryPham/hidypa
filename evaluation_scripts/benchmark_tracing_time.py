@@ -70,8 +70,12 @@ from src.reedsolomon import (  # noqa: E402
     payload_to_symbols,
 )
 
+# Payload width and the Segment-WM RS parameters are set from --l-bits in main().
+# The RS table mirrors DEFAULT_RS_PARAMS in src/segment_watermark.py so the
+# baseline is exactly the one that scheme would use at each width.
 L_BITS = 16
-SEGMENT_RS = (6, 4, 4)          # DEFAULT_RS_PARAMS[16] in src/segment_watermark.py
+SEGMENT_RS_BY_L = {8: (4, 2, 4), 12: (6, 3, 4), 16: (6, 4, 4), 32: (6, 4, 8)}
+SEGMENT_RS = SEGMENT_RS_BY_L[16]
 
 
 # --------------------------------------------------------------------- channel
@@ -195,8 +199,8 @@ class NaivePureTracer(Tracer):
     torch, so the baseline is available on any machine.
     """
 
-    name = "naive"
-    note = "O(N) scan over binary user IDs"
+    name = "MAU"
+    note = "flat binary user ID, O(N) scan"
 
     def __init__(self, num_users: int):
         self.num_users = num_users
@@ -306,34 +310,47 @@ class SegmentTracer(Tracer):
 
 # ------------------------------------------------------------------------ build
 
-def build_tracers(selected, users_file, num_users, include_asis=False, quiet=True):
+def build_tracers(selected, users_file, num_users, depths=(2, 3, 4),
+                  include_scan=False, include_asis=False, quiet=True):
+    """
+    MAU (flat), Segment-WM (RS), and Hi-DyPa at each requested depth.
+
+    Hi-DyPa rows use the factorised decoder: every layer is resolved from its own
+    bits in one table lookup, with no tree walk, so the layers are independent.
+    --include-scan adds the sequential coarse-to-fine decoder for contrast.
+    """
     tracers = []
 
     def wants(name):
         return not selected or name in selected
 
-    if wants("naive"):
+    if wants("MAU"):
         tracers.append(NaivePureTracer(num_users))
-    if wants("hi_dypa_2layer"):
-        tracers.append(LegacyHiDyPaPureTracer(num_users))
-    if wants("hier_2layer_optC"):
-        tracers.append(HierTracer("hier_2layer_optC", load_spec("l16_8_8_optionC"),
-                                  num_users, use_tables=False,
-                                  note="8+8 d=(4,2), bitwise"))
-    if wants("hier_3layer_scan"):
-        tracers.append(HierTracer("hier_3layer_scan", load_spec("l16_8_4_4"),
-                                  num_users, use_tables=False,
-                                  note="8+4+4 d=(4,2,2), bitwise"))
-    if wants("hier_3layer_tables"):
-        tracers.append(HierTracer("hier_3layer_tables", load_spec("l16_8_4_4"),
-                                  num_users, use_tables=True,
-                                  note="8+4+4 d=(4,2,2), decode tables"))
-    if wants("segment_rs_ml"):
-        tracers.append(SegmentTracer("segment_rs_ml", num_users, exhaustive=True,
-                                     note="RS(6,4,4) nearest-codeword + naive match"))
-    if wants("segment_rs_synd"):
-        tracers.append(SegmentTracer("segment_rs_synd", num_users, exhaustive=False,
-                                     note="RS(6,4,4) syndrome decode + naive match"))
+
+    for depth in depths:
+        config = f"l{L_BITS}_d{depth}"
+        try:
+            spec = load_spec(config)
+        except (ValueError, FileNotFoundError, KeyError) as exc:
+            print(f"  ! no config {config} ({exc}); skipping depth {depth}")
+            continue
+        layout = "+".join(str(lv.bits) for lv in spec.levels)
+        dist = ",".join(str(lv.min_distance) for lv in spec.levels)
+        if wants(f"HiDyPa-{depth}L"):
+            tracers.append(HierTracer(
+                f"HiDyPa-{depth}L", spec, num_users, use_tables=True,
+                note=f"{layout} d=({dist}) factorised, layers independent"))
+        if include_scan and wants(f"HiDyPa-{depth}L-scan"):
+            tracers.append(HierTracer(
+                f"HiDyPa-{depth}L-scan", spec, num_users, use_tables=False,
+                note=f"{layout} d=({dist}) sequential coarse-to-fine"))
+
+    if wants("Segment-ML"):
+        tracers.append(SegmentTracer("Segment-ML", num_users, exhaustive=True,
+                                     note=f"RS{SEGMENT_RS} nearest-codeword + match"))
+    if wants("Segment-syndrome"):
+        tracers.append(SegmentTracer("Segment-syndrome", num_users, exhaustive=False,
+                                     note=f"RS{SEGMENT_RS} syndrome decode + match"))
 
     if include_asis:
         tracers.extend(_build_asis_tracers(users_file, num_users, quiet))
@@ -475,11 +492,21 @@ def main():
                         help="Comma-separated subset; default is all.")
     parser.add_argument("--seed", type=int, default=20260908)
     parser.add_argument("--output", type=str, default="evaluation/tracing_time/results.json")
+    parser.add_argument("--l-bits", type=int, default=16, choices=[8, 12, 16],
+                        help="Payload width; selects the config set and the RS parameters.")
+    parser.add_argument("--depths", type=str, default="2,3,4",
+                        help="Hi-DyPa depths to compare, e.g. 2,3,4")
+    parser.add_argument("--include-scan", action="store_true",
+                        help="Also time the sequential decoder for each depth.")
     parser.add_argument("--include-asis", action="store_true",
                         help="Also time the shipped watermark.py classes (needs torch).")
     parser.add_argument("--run-tag", type=str, default=None)
     args = parser.parse_args()
 
+    global L_BITS, SEGMENT_RS
+    L_BITS = args.l_bits
+    SEGMENT_RS = SEGMENT_RS_BY_L[L_BITS]
+    depths = tuple(int(v) for v in args.depths.split(","))
     selected = set(args.schemes.split(",")) if args.schemes else None
     rates = [float(v) for v in args.erasure_rates.split(",")]
     user_counts = ([int(v) for v in args.n_sweep.split(",")] if args.n_sweep
@@ -501,6 +528,7 @@ def main():
     for num_users in user_counts:
         print(f"\n{'#' * 96}\n# N = {num_users} users\n{'#' * 96}")
         tracers = build_tracers(selected, args.users_file, num_users,
+                                depths=depths, include_scan=args.include_scan,
                                 include_asis=args.include_asis)
         for rate in rates:
             print(f"\n--- erasure rate {rate:.2f} "
@@ -524,9 +552,13 @@ def main():
         "config": {
             "L": L_BITS,
             "segment_rs": {"n": SEGMENT_RS[0], "k": SEGMENT_RS[1], "m": SEGMENT_RS[2]},
+            "depths": list(depths),
             "hierarchies": {
-                name: load_spec(name).to_dict()
-                for name in ("l16_8_4_4", "l16_8_8_optionC")
+                f"l{L_BITS}_d{d}": load_spec(f"l{L_BITS}_d{d}").to_dict()
+                for d in depths
+                if os.path.exists(os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "config", "hierarchies", f"l{L_BITS}_d{d}.json"))
             },
             "trials": args.trials,
             "repeat": args.repeat,
@@ -547,21 +579,21 @@ def main():
 
     # headline speedups at the largest N, per erasure rate
     print("\n" + "=" * 96)
-    print("SPEEDUP of hier_3layer_tables over each baseline")
+    print("SPEEDUP of the first Hi-DyPa row over each other scheme")
     print("=" * 96)
     top_n = user_counts[-1]
     for rate in rates:
         rows = {r["scheme"]: r for r in records
                 if r["num_users"] == top_n and r["erasure_rate"] == rate}
-        ours = rows.get("hier_3layer_tables")
+        ours = next((rows[k] for k in rows if k.startswith("HiDyPa-")), None)
         if not ours:
             continue
         parts = []
         for name, row in rows.items():
-            if name == "hier_3layer_tables":
+            if ours is not None and row is ours:
                 continue
             parts.append(f"{name} x{row['us_per_trace_median'] / ours['us_per_trace_median']:.1f}")
-        print(f"  p={rate:.2f}: " + "  ".join(parts))
+        print(f"  p={rate:.2f} [{ours['scheme']}]: " + "  ".join(parts))
 
 
 if __name__ == "__main__":

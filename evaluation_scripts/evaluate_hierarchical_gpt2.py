@@ -85,6 +85,27 @@ GPT2_CONTEXT = 1024
 
 # --------------------------------------------------------------------- detection
 
+def detect_segment(seg, master_key: bytes, text: str) -> dict:
+    """
+    Segment-WM detection. It argmaxes a per-segment count array rather than
+    running 2L zero-bit tests, so there are no per-bit z-scores and no block
+    count -- the shared fields are filled with the scheme's own equivalents.
+    """
+    result = seg.score_text(master_key, text)
+    payload = result["payload"]
+    gated = (payload is None
+             or (seg.gate_on_z and result["z_score"] < seg.z_threshold))
+    codeword = "⊥" * seg.L if gated else format(payload, f"0{seg.L}b")
+    return {
+        "codeword": codeword,
+        "z0": [], "z1": [],
+        "blocks": result.get("num_tokens", 0),
+        "num_tokens": result.get("num_tokens", 0),
+        "segment_z": result.get("z_score"),
+        "segment_symbols": result.get("symbols"),
+    }
+
+
 def detect_with_stats(lbw: LBitWatermarker, master_key: bytes, text: str) -> dict:
     """
     Mirror LBitWatermarker.detect but also return the per-bit z-scores and the
@@ -174,6 +195,17 @@ def build_scheme(name: str, lbw: LBitWatermarker, users_file: str, num_users: in
         )
         muw.load_users(users_file)
         info = {"scheme": "hi_dypa_2layer", "layout": f"G={half}/U={lbw.L - half} d=(2,1)"}
+    elif name == "segment":
+        from src.segment_watermark import (  # noqa: E402
+            SegmentMultiUserWatermarker,
+            SegmentWatermarker,
+        )
+        seg = SegmentWatermarker(lbw.model, L=lbw.L, z_threshold=lbw.zero_bit.z_threshold)
+        muw = SegmentMultiUserWatermarker(seg)
+        muw.load_users(users_file)
+        info = {"scheme": "segment",
+                "layout": f"RS(n={seg.n_segments},k={seg.k_segments},m={seg.segment_bit}) "
+                          f"t={seg.rs.t}"}
     elif name.startswith("hier:"):
         spec = load_spec(name.split(":", 1)[1])
         muw = HierarchicalMultiUserWatermarker(lbw, spec, use_tables=True)
@@ -246,7 +278,10 @@ def run_trials(muw, info, lbw, master_key, prompts, users, model_name,
         gen_seconds = time.perf_counter() - t0
 
         t1 = time.perf_counter()
-        det = detect_with_stats(lbw, master_key, text)
+        if info["scheme"] == "segment":
+            det = detect_segment(muw.lbw, master_key, text)
+        else:
+            det = detect_with_stats(lbw, master_key, text)
         det_seconds = time.perf_counter() - t1
 
         record = {
@@ -259,7 +294,7 @@ def run_trials(muw, info, lbw, master_key, prompts, users, model_name,
             "blocks_per_bit": det["blocks"] / lbw.L if lbw.L else 0.0,
             "num_tokens": det["num_tokens"],
             "mean_z_max": float(np.mean([max(a, b) for a, b in zip(det["z0"], det["z1"])]))
-            if det["z0"] else 0.0,
+            if det["z0"] else float(det.get("segment_z") or 0.0),
             "min_z_max": float(min((max(a, b) for a, b in zip(det["z0"], det["z1"])),
                                    default=0.0)),
             "gen_seconds": gen_seconds,
@@ -337,8 +372,8 @@ def main():
                         help="calibrate mode: payload widths to try")
     parser.add_argument("--token-sweep", default="256,512,900",
                         help="calibrate mode: max_new_tokens to try")
-    parser.add_argument("--schemes", default="hier:l16_8_4_4,hier:l16_8_8_optionC,"
-                                             "hi_dypa_2layer,naive",
+    parser.add_argument("--schemes", default="hier:l16_d2,hier:l16_d3,hier:l16_d4,"
+                                             "naive,segment",
                         help="full mode: comma-separated schemes")
     parser.add_argument("--delta", type=float, default=3.5)
     parser.add_argument("--entropy-threshold", type=float, default=2.5)
