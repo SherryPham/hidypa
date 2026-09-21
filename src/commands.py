@@ -1,4 +1,3 @@
-# cli_commands.py: Command handlers for the CLI
 
 import os
 import json
