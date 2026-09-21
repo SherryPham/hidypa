@@ -7,8 +7,9 @@
 # never loads a language model, so it does NOT request a GPU. Do not run it on
 # milan-gpu; that would hold an A100 idle for the whole job.
 #
-# Timing stability matters here, so the job asks for a whole node (--exclusive).
-# If your allocation cannot do that, drop --exclusive and raise --repeat instead.
+# OzSTAR rejects --exclusive ("please request the number of cores you need per
+# task with --cpus-per-task"), so the node is shared. Shared nodes add timing
+# jitter; --repeat 9 and reporting the MEDIAN is what absorbs it.
 # =============================================================================
 #SBATCH --job-name=hidypa_tracing_time
 #SBATCH --account=oz411
@@ -18,7 +19,6 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=02:00:00
-#SBATCH --exclusive
 #SBATCH --output=/home/trpham/hidypa/slurm_out/slurm-%j.out
 
 # =============================================================================

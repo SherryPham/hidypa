@@ -21,19 +21,24 @@
 # factorised fast path would never fire, and the measurement would be of the
 # fallback path rather than the decoder under test.
 #
-# THIS JOB NEEDS NO GPU. It measures codeword -> identity only and never loads a
-# language model. It is requested on a CPU partition for that reason; switch the
-# -p line to milan-gpu with --gres=gpu:1 only if the CPU queue is worse.
+# Requested on milan-gpu so the run sits on the same A100 hardware as the rest of
+# the results. Note the benchmark itself is pure CPU -- it maps codewords to
+# identities and never loads a language model -- so the GPU stays idle. The
+# timings are unaffected by that; only the queue wait is.
+#
+# OzSTAR does not allow --exclusive, so the node is shared. Shared nodes add
+# timing jitter, which is why --repeat defaults to 9 and the reported figure is
+# the MEDIAN of those runs rather than the mean.
 # =============================================================================
 #SBATCH --job-name=hidypa_8bit_layers
 #SBATCH --account=oz411
-#SBATCH -p milan                       # CPU partition — check `sinfo -s`
+#SBATCH -p milan-gpu
+#SBATCH --gres=gpu:1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=03:00:00
-#SBATCH --exclusive
 #SBATCH --output=/home/trpham/hidypa/slurm_out/slurm-%j.out
 
 module --force purge
@@ -70,6 +75,11 @@ RATES=${RATES:-0.0,0.02,0.05,0.10,0.15,0.20}
 echo "=========================================="
 echo "Run tag : ${RUN_TAG}"
 echo "Node    : $(hostname)   CPUs: ${SLURM_CPUS_PER_TASK:-?}"
+if command -v nvidia-smi >/dev/null 2>&1; then
+    echo "GPU     : $(nvidia-smi --query-gpu=name --format=csv,noheader | head -1) (allocated, unused)"
+else
+    echo "GPU     : $(scontrol show node "$(hostname -s)" 2>/dev/null | grep -oiE 'Gres=[^ ]*' | head -1) (allocated, unused)"
+fi
 echo "Users   : ${NUM_USERS} from ${USERS}"
 echo "=========================================="
 
