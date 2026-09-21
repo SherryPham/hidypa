@@ -1,0 +1,25 @@
+{
+  "name": "l24_8x3",
+  "L": 24,
+  "levels": [
+    {
+      "name": "level1",
+      "bits": 8,
+      "fanout": 16,
+      "min_distance": 2
+    },
+    {
+      "name": "level2",
+      "bits": 8,
+      "fanout": 16,
+      "min_distance": 2
+    },
+    {
+      "name": "level3",
+      "bits": 8,
+      "fanout": 16,
+      "min_distance": 2
+    }
+  ],
+  "assignment": "sequential"
+}

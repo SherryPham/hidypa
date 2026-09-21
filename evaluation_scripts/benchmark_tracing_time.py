@@ -74,7 +74,8 @@ from src.reedsolomon import (  # noqa: E402
 # The RS table mirrors DEFAULT_RS_PARAMS in src/segment_watermark.py so the
 # baseline is exactly the one that scheme would use at each width.
 L_BITS = 16
-SEGMENT_RS_BY_L = {8: (4, 2, 4), 12: (6, 3, 4), 16: (6, 4, 4), 32: (6, 4, 8)}
+SEGMENT_RS_BY_L = {8: (4, 2, 4), 12: (6, 3, 4), 16: (6, 4, 4),
+                   24: (8, 6, 4), 32: (6, 4, 8)}
 SEGMENT_RS = SEGMENT_RS_BY_L[16]
 
 
@@ -311,7 +312,8 @@ class SegmentTracer(Tracer):
 # ------------------------------------------------------------------------ build
 
 def build_tracers(selected, users_file, num_users, depths=(2, 3, 4),
-                  include_scan=False, include_asis=False, quiet=True):
+                  include_scan=False, include_asis=False, quiet=True,
+                  hier_configs=None):
     """
     MAU (flat), Segment-WM (RS), and Hi-DyPa at each requested depth.
 
@@ -327,13 +329,18 @@ def build_tracers(selected, users_file, num_users, depths=(2, 3, 4),
     if wants("MAU"):
         tracers.append(NaivePureTracer(num_users))
 
-    for depth in depths:
-        config = f"l{L_BITS}_d{depth}"
+    entries = ([(None, c) for c in hier_configs] if hier_configs
+               else [(d, f"l{L_BITS}_d{d}") for d in depths])
+    for depth, config in entries:
         try:
             spec = load_spec(config)
         except (ValueError, FileNotFoundError, KeyError) as exc:
             print(f"  ! no config {config} ({exc}); skipping depth {depth}")
             continue
+        if spec.L != L_BITS:
+            print(f"  ! {config} spans {spec.L} bits but --l-bits is {L_BITS}; skipping")
+            continue
+        depth = spec.depth
         layout = "+".join(str(lv.bits) for lv in spec.levels)
         dist = ",".join(str(lv.min_distance) for lv in spec.levels)
         if wants(f"HiDyPa-{depth}L"):
@@ -492,10 +499,12 @@ def main():
                         help="Comma-separated subset; default is all.")
     parser.add_argument("--seed", type=int, default=20260908)
     parser.add_argument("--output", type=str, default="evaluation/tracing_time/results.json")
-    parser.add_argument("--l-bits", type=int, default=16, choices=[8, 12, 16],
+    parser.add_argument("--l-bits", type=int, default=16, choices=[8, 12, 16, 24, 32],
                         help="Payload width; selects the config set and the RS parameters.")
     parser.add_argument("--depths", type=str, default="2,3,4",
-                        help="Hi-DyPa depths to compare, e.g. 2,3,4")
+                        help="Hi-DyPa depths to compare; looks up config l<L>_d<depth>.")
+    parser.add_argument("--hier-configs", type=str, default=None,
+                        help=("Explicit config names instead of --depths, e.g. " "l16_8x2. Use when L varies with depth; every config " "listed must match --l-bits."))
     parser.add_argument("--include-scan", action="store_true",
                         help="Also time the sequential decoder for each depth.")
     parser.add_argument("--include-asis", action="store_true",
@@ -507,6 +516,8 @@ def main():
     L_BITS = args.l_bits
     SEGMENT_RS = SEGMENT_RS_BY_L[L_BITS]
     depths = tuple(int(v) for v in args.depths.split(","))
+    hier_configs = ([c.strip() for c in args.hier_configs.split(",")]
+                    if args.hier_configs else None)
     selected = set(args.schemes.split(",")) if args.schemes else None
     rates = [float(v) for v in args.erasure_rates.split(",")]
     user_counts = ([int(v) for v in args.n_sweep.split(",")] if args.n_sweep
@@ -529,7 +540,8 @@ def main():
         print(f"\n{'#' * 96}\n# N = {num_users} users\n{'#' * 96}")
         tracers = build_tracers(selected, args.users_file, num_users,
                                 depths=depths, include_scan=args.include_scan,
-                                include_asis=args.include_asis)
+                                include_asis=args.include_asis,
+                                hier_configs=hier_configs)
         for rate in rates:
             print(f"\n--- erasure rate {rate:.2f} "
                   f"(flip {args.flip_rate:.2f}) ---")
@@ -554,11 +566,11 @@ def main():
             "segment_rs": {"n": SEGMENT_RS[0], "k": SEGMENT_RS[1], "m": SEGMENT_RS[2]},
             "depths": list(depths),
             "hierarchies": {
-                f"l{L_BITS}_d{d}": load_spec(f"l{L_BITS}_d{d}").to_dict()
-                for d in depths
+                c: load_spec(c).to_dict()
+                for c in (hier_configs or [f"l{L_BITS}_d{d}" for d in depths])
                 if os.path.exists(os.path.join(
                     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                    "config", "hierarchies", f"l{L_BITS}_d{d}.json"))
+                    "config", "hierarchies", f"{c}.json"))
             },
             "trials": args.trials,
             "repeat": args.repeat,
