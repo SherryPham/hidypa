@@ -714,6 +714,83 @@ class TableDecoder:
                          per_level_distance, evaluated)
 
 
+
+class BatchDecoder:
+    """
+    Decode many recovered codewords at once, one vector operation per layer.
+
+    This is the form of "run the layers in parallel" that actually pays. Each
+    layer becomes a single array op over the whole batch, so D layers cost D
+    vector ops instead of batch_size x D scalar lookups. Threading the layers
+    on top does NOT help -- the ops are memory-bound array indexing, and at
+    small batches the dispatch overhead makes it slower (measured).
+
+    numpy is imported lazily so the rest of this module stays stdlib-only.
+    Traces that tie at some layer, or whose path runs through a partially
+    filled node, fall back to the per-trace decoder and stay exact.
+    """
+
+    __slots__ = ("index", "_table", "_np", "_mask", "_pow", "_weights", "_trans")
+
+    def __init__(self, index: HierarchyIndex, table_decoder: "TableDecoder | None" = None):
+        try:
+            import numpy as np
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError("BatchDecoder needs numpy; use TableDecoder instead.") from exc
+        self._np = np
+        self.index = index
+        self._table = table_decoder or TableDecoder(index)
+        self._mask = [np.array(get_decode_table(cb).mask, dtype=np.int64)
+                      for cb in index.codebooks]
+        self._pow = [np.array([1 << (lv.bits - 1 - j) for j in range(lv.bits)],
+                              dtype=np.int64) for lv in index.spec.levels]
+        self._weights = np.array(index.weights, dtype=np.int64)
+        self._trans = str.maketrans({sym: "2" for sym in ERASURE_SYMBOLS})
+
+    def decode_rows(self, payloads: list[str]) -> list[int | None]:
+        """Row index per payload, or None where no single user is implied."""
+        np = self._np
+        index = self.index
+        spec = index.spec
+        if not payloads:
+            return []
+        for payload in payloads:
+            if len(payload) != spec.L:
+                raise ValueError(
+                    f"Recovered codeword has length {len(payload)}, expected {spec.L}."
+                )
+
+        flat = "".join(p.translate(self._trans) for p in payloads).encode("ascii")
+        chars = np.frombuffer(flat, dtype=np.uint8).reshape(len(payloads), spec.L)
+        is_one = chars == 0x31          # '1'
+        is_erased = chars == 0x32       # erasure sentinel
+
+        resolved = np.ones(len(payloads), dtype=bool)
+        child = np.zeros((len(payloads), index.depth), dtype=np.int64)
+        for level, (start, end) in enumerate(spec.offsets):
+            bits = spec.levels[level].bits
+            value = is_one[:, start:end].astype(np.int64) @ self._pow[level]
+            erasure = is_erased[:, start:end].astype(np.int64) @ self._pow[level]
+            mask = self._mask[level][(value << bits) | erasure]
+            resolved &= (mask != 0) & ((mask & (mask - 1)) == 0)
+            child[:, level] = np.log2(np.maximum(mask, 1)).astype(np.int64)
+
+        # A prefix is safe only when its whole subtree is occupied; otherwise the
+        # table's full-fanout mask can name children that do not exist there.
+        starts = np.cumsum(child * self._weights, axis=1)
+        resolved &= np.all(starts + self._weights <= index.num_users, axis=1)
+
+        rows = (child @ self._weights).tolist()
+        flags = resolved.tolist()
+        out: list[int | None] = []
+        for i, ok in enumerate(flags):
+            if ok:
+                out.append(int(rows[i]))
+            else:
+                out.append(self._table.decode(payloads[i]).row)
+        return out
+
+
 # ------------------------------------------------------------------- config lookup
 
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

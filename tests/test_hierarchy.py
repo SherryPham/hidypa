@@ -369,3 +369,39 @@ def test_fast_path_bails_on_ragged_node():
     decoder = TableDecoder(index)
     word = index.codeword_of_row(988)          # path (15, 3, 4)
     assert decoder.decode(word).path == (15, 3, 4)
+
+
+def test_batch_decoder_matches_per_trace():
+    """BatchDecoder must agree with TableDecoder on every trace, both tree shapes."""
+    try:
+        from src.hierarchy import BatchDecoder
+        import numpy  # noqa: F401
+    except ImportError:
+        return                                   # numpy absent: batch path is optional
+    for num_users in (1024, 1000):
+        index = HierarchyIndex(OPTION_C3, num_users)
+        decoder = TableDecoder(index)
+        batch = BatchDecoder(index, decoder)
+        rng = random.Random(909)
+        payloads = []
+        for _ in range(3000):
+            row = rng.randrange(num_users)
+            word = list(index.codeword_of_row(row))
+            for _ in range(rng.randrange(0, 4)):
+                word[rng.randrange(16)] = rng.choice("01⊥*")
+            payloads.append("".join(word))
+        assert batch.decode_rows(payloads) == [decoder.decode(p).row for p in payloads]
+
+
+def test_batch_decoder_rejects_wrong_length():
+    try:
+        from src.hierarchy import BatchDecoder
+        import numpy  # noqa: F401
+    except ImportError:
+        return
+    batch = BatchDecoder(HierarchyIndex(OPTION_C3, 1000))
+    try:
+        batch.decode_rows(["0101"])
+        raise AssertionError("expected ValueError for a short codeword")
+    except ValueError:
+        pass
